@@ -161,6 +161,58 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Get open issues
+	fmt.Fprintf(os.Stderr, "Fetching open issues...\n")
+	openIssues, err := ghClient.GetOpenIssues(repo)
+	if err != nil {
+		return fmt.Errorf("failed to get open issues: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Found %d open issues\n", len(openIssues))
+
+	// Get closed issues
+	fmt.Fprintf(os.Stderr, "Fetching closed issues...\n")
+	closedIssues, err := ghClient.GetClosedIssues(repo, fromISO, toISO)
+	if err != nil {
+		return fmt.Errorf("failed to get closed issues: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Found %d closed issues\n\n", len(closedIssues))
+
+	// Display first 3 open issues for verification
+	if len(openIssues) > 0 {
+		fmt.Fprintf(os.Stderr, "Sample Open Issues:\n")
+		for i, issue := range openIssues {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(os.Stderr, "  Issue #%d: %s\n", issue.Number, issue.Title)
+			fmt.Fprintf(os.Stderr, "    Author: %s\n", issue.Author.Login)
+			fmt.Fprintf(os.Stderr, "    State: %s\n", issue.State)
+			fmt.Fprintf(os.Stderr, "    Created: %s\n", issue.CreatedAt.Format("2006-01-02"))
+			if len(issue.Labels) > 0 {
+				fmt.Fprintf(os.Stderr, "    Labels: %v\n", issue.Labels)
+			}
+			fmt.Fprintf(os.Stderr, "\n")
+		}
+	}
+
+	// Display first 3 closed issues for verification
+	if len(closedIssues) > 0 {
+		fmt.Fprintf(os.Stderr, "Sample Closed Issues:\n")
+		for i, issue := range closedIssues {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(os.Stderr, "  Issue #%d: %s\n", issue.Number, issue.Title)
+			fmt.Fprintf(os.Stderr, "    Author: %s\n", issue.Author.Login)
+			if issue.ClosedAt != nil {
+				fmt.Fprintf(os.Stderr, "    Closed: %s\n", issue.ClosedAt.Format("2006-01-02"))
+			}
+			fmt.Fprintf(os.Stderr, "\n")
+		}
+	}
+
 	return nil
 }
 
