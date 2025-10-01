@@ -1,0 +1,15 @@
+{
+  "repository": "owner/test-repo",
+  "repositoryURL": "https://github.com/owner/test-repo",
+  "period": {
+    "from": "2024-01-01T00:00:00Z",
+    "to": "2024-01-02T00:00:00Z"
+  },
+  "totalCommits": 3,
+  "totalAuthors": 2,
+  "activeBranches": 2,
+  "openPRs": 1,
+  "updatedPRs": 1,
+  "openIssues": 1,
+  "closedIssues": 1
+}

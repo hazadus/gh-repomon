@@ -15,10 +15,26 @@ import (
 	"github.com/hazadus/gh-repomon/internal/utils"
 )
 
+// GitHubClient defines the interface for GitHub API operations
+type GitHubClient interface {
+	GetActiveBranches(repo string, from, to time.Time) ([]types.Branch, error)
+	GetOpenPullRequests(repo string) ([]types.PullRequest, error)
+	GetUpdatedPullRequests(repo, from, to string) ([]types.PullRequest, error)
+	GetOpenIssues(repo string) ([]types.Issue, error)
+	GetClosedIssues(repo, from, to string) ([]types.Issue, error)
+}
+
+// LLMClient defines the interface for LLM operations
+type LLMClient interface {
+	GenerateOverallSummary(data *types.ReportData, language, model string) (string, error)
+	GenerateBranchSummary(branch *types.Branch, language, model string) (string, error)
+	GeneratePRSummary(pr *types.PullRequest, language, model string) (string, error)
+}
+
 // Generator generates reports based on GitHub activity data
 type Generator struct {
-	githubClient *github.Client
-	llmClient    *llm.Client
+	githubClient GitHubClient
+	llmClient    LLMClient
 	logger       *logger.Logger
 }
 
@@ -46,6 +62,16 @@ type Options struct {
 
 // NewGenerator creates a new report generator
 func NewGenerator(ghClient *github.Client, llmClient *llm.Client) *Generator {
+	return &Generator{
+		githubClient: ghClient,
+		llmClient:    llmClient,
+		logger:       logger.New(),
+	}
+}
+
+// NewGeneratorWithClients creates a new report generator with custom client implementations
+// This is useful for testing with mock clients
+func NewGeneratorWithClients(ghClient GitHubClient, llmClient LLMClient) *Generator {
 	return &Generator{
 		githubClient: ghClient,
 		llmClient:    llmClient,
@@ -85,11 +111,13 @@ func (g *Generator) Generate(opts Options) (string, error) {
 		// Generate branch summaries in parallel with rate limiting
 		maxWorkers := 5 // Limit concurrent LLM requests
 		branchSummaryErrors := 0
+		var branchMu sync.Mutex
 
 		err = utils.ProcessInParallel(data.Branches, maxWorkers, func(branch types.Branch) error {
 			branchSummary, err := g.llmClient.GenerateBranchSummary(&branch, opts.Language, opts.Model)
 
 			// Find the branch in data.Branches and update it
+			branchMu.Lock()
 			for i := range data.Branches {
 				if data.Branches[i].Name == branch.Name {
 					if err != nil {
@@ -103,6 +131,7 @@ func (g *Generator) Generate(opts Options) (string, error) {
 					break
 				}
 			}
+			branchMu.Unlock()
 
 			// Don't fail the entire process if one summary fails
 			return nil
@@ -120,11 +149,13 @@ func (g *Generator) Generate(opts Options) (string, error) {
 		totalPRs := len(data.OpenPRs) + len(data.UpdatedPRs)
 		prSuccessCount := 0
 		prErrors := 0
+		var prMu sync.Mutex
 
 		// Generate summaries for open PRs
 		err = utils.ProcessInParallel(data.OpenPRs, maxWorkers, func(pr types.PullRequest) error {
 			prSummary, err := g.llmClient.GeneratePRSummary(&pr, opts.Language, opts.Model)
 
+			prMu.Lock()
 			for i := range data.OpenPRs {
 				if data.OpenPRs[i].Number == pr.Number {
 					if err != nil {
@@ -139,6 +170,7 @@ func (g *Generator) Generate(opts Options) (string, error) {
 					break
 				}
 			}
+			prMu.Unlock()
 			return nil
 		})
 
@@ -150,6 +182,7 @@ func (g *Generator) Generate(opts Options) (string, error) {
 		err = utils.ProcessInParallel(data.UpdatedPRs, maxWorkers, func(pr types.PullRequest) error {
 			prSummary, err := g.llmClient.GeneratePRSummary(&pr, opts.Language, opts.Model)
 
+			prMu.Lock()
 			for i := range data.UpdatedPRs {
 				if data.UpdatedPRs[i].Number == pr.Number {
 					if err != nil {
@@ -164,6 +197,7 @@ func (g *Generator) Generate(opts Options) (string, error) {
 					break
 				}
 			}
+			prMu.Unlock()
 			return nil
 		})
 

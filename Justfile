@@ -28,6 +28,15 @@ test-coverage:
     go tool cover -html=coverage.out -o coverage.html
     @echo "Coverage report generated: coverage.html"
 
+# Run integration tests only
+test-integration:
+    go test -v -race -tags=integration ./test/integration/...
+
+# Run all tests (unit + integration)
+test-all:
+    go test -v -race ./...
+    go test -v -race -tags=integration ./test/integration/...
+
 # Clean build artifacts
 clean:
     rm -rf bin/
