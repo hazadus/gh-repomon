@@ -43,9 +43,9 @@ func (c *Client) GetCommits(repo, branch string, from, to time.Time) ([]types.Co
 		path += fmt.Sprintf("&sha=%s", branch)
 	}
 
-	// Make API request
+	// Make API request with retry
 	var response []commitResponse
-	err := c.client.Get(path, &response)
+	err := c.doWithRetry("GET", path, nil, &response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commits: %w", err)
 	}
@@ -100,9 +100,9 @@ func (c *Client) GetCommitStats(repo, sha string) (additions, deletions int, err
 	// Build API path
 	path := fmt.Sprintf("repos/%s/commits/%s", repo, sha)
 
-	// Make API request
+	// Make API request with retry
 	var response commitResponse
-	err = c.client.Get(path, &response)
+	err = c.doWithRetry("GET", path, nil, &response)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get commit stats: %w", err)
 	}

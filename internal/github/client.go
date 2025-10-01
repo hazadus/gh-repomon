@@ -1,8 +1,12 @@
 package github
 
 import (
-	"github.com/cli/go-gh/v2/pkg/api"
+	"net/http"
 	"strings"
+	"time"
+
+	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/hazadus/gh-repomon/internal/errors"
 )
 
 // Client is a GitHub API client wrapper
@@ -15,13 +19,77 @@ type Client struct {
 func NewClient(excludeBots bool) (*Client, error) {
 	client, err := api.DefaultRESTClient()
 	if err != nil {
-		return nil, err
+		return nil, errors.NewGitHubAuthError("failed to create GitHub REST client", err)
 	}
 
 	return &Client{
 		client:      client,
 		excludeBots: excludeBots,
 	}, nil
+}
+
+// doWithRetry performs a GET request with retry logic for transient errors
+func (c *Client) doWithRetry(method, path string, body interface{}, response interface{}) error {
+	maxRetries := 3
+	retryDelay := time.Second
+
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			time.Sleep(retryDelay)
+			retryDelay *= 2 // Exponential backoff
+		}
+
+		// We only support GET requests with retry for now
+		var err error
+		if method == "GET" {
+			err = c.client.Get(path, response)
+		} else {
+			return errors.NewGitHubAPIError("unsupported method for retry", 0, nil)
+		}
+
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		// Check if it's a rate limit error (status 403)
+		if strings.Contains(err.Error(), "403") {
+			return errors.NewGitHubAPIError("rate limit exceeded", http.StatusForbidden, err)
+		}
+
+		// Check if it's a 404 error (not found)
+		if strings.Contains(err.Error(), "404") {
+			return errors.NewGitHubAPIError("resource not found", http.StatusNotFound, err)
+		}
+
+		// Retry on network errors or 5xx errors
+		if isRetryableError(err) {
+			continue
+		}
+
+		// Non-retryable error, return immediately
+		return errors.NewGitHubAPIError("API request failed", 0, err)
+	}
+
+	return errors.NewGitHubAPIError("API request failed after retries", 0, lastErr)
+}
+
+// isRetryableError checks if an error is worth retrying
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+	// Network errors and 5xx errors are retryable
+	return strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "connection") ||
+		strings.Contains(errStr, "500") ||
+		strings.Contains(errStr, "502") ||
+		strings.Contains(errStr, "503") ||
+		strings.Contains(errStr, "504")
 }
 
 // isBot checks if a login belongs to a bot account

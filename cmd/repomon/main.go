@@ -5,8 +5,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/hazadus/gh-repomon/internal/errors"
 	"github.com/hazadus/gh-repomon/internal/github"
 	"github.com/hazadus/gh-repomon/internal/llm"
+	"github.com/hazadus/gh-repomon/internal/logger"
 	"github.com/hazadus/gh-repomon/internal/report"
 	"github.com/hazadus/gh-repomon/internal/types"
 	"github.com/spf13/cobra"
@@ -46,9 +48,12 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	// Create logger
+	log := logger.New()
+
 	// Validate that --repo is provided
 	if repo == "" {
-		return fmt.Errorf("--repo flag is required")
+		return errors.NewInvalidParamsError("repo", "repository flag is required")
 	}
 
 	// Calculate period
@@ -59,19 +64,19 @@ func run(cmd *cobra.Command, args []string) error {
 	if fromDate != "" && toDate != "" {
 		from, err = parseDate(fromDate)
 		if err != nil {
-			return fmt.Errorf("invalid --from date: %w", err)
+			return errors.NewInvalidParamsError("from", fmt.Sprintf("invalid date format: %v", err))
 		}
 
 		to, err = parseDate(toDate)
 		if err != nil {
-			return fmt.Errorf("invalid --to date: %w", err)
+			return errors.NewInvalidParamsError("to", fmt.Sprintf("invalid date format: %v", err))
 		}
 
 		if from.After(to) {
-			return fmt.Errorf("--from date must be before --to date")
+			return errors.NewInvalidParamsError("from/to", "from date must be before to date")
 		}
 	} else if fromDate != "" || toDate != "" {
-		return fmt.Errorf("both --from and --to must be specified together")
+		return errors.NewInvalidParamsError("from/to", "both --from and --to must be specified together")
 	} else {
 		// Use --days
 		to = time.Now().UTC()
@@ -79,32 +84,27 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create GitHub client
+	log.Info("Connecting to GitHub API...")
 	ghClient, err := github.NewClient(excludeBots)
 	if err != nil {
-		return fmt.Errorf("failed to create GitHub client: %w", err)
+		return errors.NewGitHubAuthError("failed to create GitHub client", err)
 	}
-
-	// Output progress to stderr
-	fmt.Fprintf(os.Stderr, "Connected to GitHub API\n")
+	log.Success("Connected to GitHub API")
 
 	// Create LLM client
+	log.Info("Connecting to LLM API...")
 	llmClient, err := llm.NewClient()
 	if err != nil {
-		return fmt.Errorf("failed to create LLM client: %w", err)
+		log.Warning("Failed to create LLM client, AI summaries will be disabled")
+		llmClient = nil
+	} else {
+		log.Success("Connected to LLM API")
 	}
-	fmt.Fprintf(os.Stderr, "Connected to LLM API\n")
 
-	// Test loading a prompt
-	promptConfig, err := llm.LoadPrompt("overall_summary")
-	if err != nil {
-		return fmt.Errorf("failed to load prompt: %w", err)
-	}
-	fmt.Fprintf(os.Stderr, "Loaded prompt: %s\n", promptConfig.Name)
-
-	fmt.Fprintf(os.Stderr, "Analyzing repository %s (%s to %s)\n",
+	log.Info(fmt.Sprintf("Analyzing repository %s (%s to %s)",
 		repo,
 		from.Format("2006-01-02"),
-		to.Format("2006-01-02"))
+		to.Format("2006-01-02")))
 
 	// Create report options
 	opts := report.Options{
@@ -121,16 +121,14 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create report generator
 	generator := report.NewGenerator(ghClient, llmClient)
 
-	// Output progress
-	fmt.Fprintf(os.Stderr, "  🔍 Collecting branches...\n")
-
 	// Generate report
+	log.Progress("Collecting repository data...")
 	reportText, err := generator.Generate(opts)
 	if err != nil {
 		return fmt.Errorf("failed to generate report: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "  ✅ Report generated successfully!\n")
+	log.Success("Report generated successfully!")
 
 	// Output report to stdout
 	fmt.Println(reportText)
@@ -149,7 +147,27 @@ func parseDate(dateStr string) (time.Time, error) {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		// Handle specific error types
+		switch e := err.(type) {
+		case *errors.ErrGitHubAuth:
+			fmt.Fprintf(os.Stderr, "❌ Authentication Error: %v\n", e)
+			fmt.Fprintf(os.Stderr, "Please ensure you are authenticated with GitHub CLI: gh auth login\n")
+			os.Exit(1)
+		case *errors.ErrGitHubAPI:
+			fmt.Fprintf(os.Stderr, "❌ GitHub API Error: %v\n", e)
+			os.Exit(1)
+		case *errors.ErrRepoNotFound:
+			fmt.Fprintf(os.Stderr, "❌ Repository Not Found: %v\n", e)
+			os.Exit(1)
+		case *errors.ErrInvalidParams:
+			fmt.Fprintf(os.Stderr, "❌ Invalid Parameters: %v\n", e)
+			os.Exit(1)
+		case *errors.ErrLLMAPI:
+			fmt.Fprintf(os.Stderr, "❌ LLM API Error: %v\n", e)
+			os.Exit(1)
+		default:
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }

@@ -2,12 +2,16 @@ package llm
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os/exec"
 	"strings"
+	"time"
+
+	"github.com/hazadus/gh-repomon/internal/errors"
 )
 
 const GitHubModelsEndpoint = "https://models.inference.ai.azure.com"
@@ -49,12 +53,12 @@ func NewClient() (*Client, error) {
 	cmd := exec.Command("gh", "auth", "token")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get GitHub token: %w", err)
+		return nil, errors.NewLLMAPIError("failed to get GitHub token", 0, err)
 	}
 
 	token := strings.TrimSpace(string(output))
 	if token == "" {
-		return nil, fmt.Errorf("GitHub token is empty")
+		return nil, errors.NewLLMAPIError("GitHub token is empty", 0, nil)
 	}
 
 	return &Client{
@@ -65,17 +69,21 @@ func NewClient() (*Client, error) {
 
 // Complete sends a chat completion request and returns the response text
 func (c *Client) Complete(request ChatCompletionRequest) (string, error) {
+	// Create context with 30 second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// Prepare request body
 	requestBody, err := json.Marshal(request)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", errors.NewLLMAPIError("failed to marshal request", 0, err)
 	}
 
-	// Create HTTP request
+	// Create HTTP request with context
 	url := c.endpoint + "/chat/completions"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return "", errors.NewLLMAPIError("failed to create request", 0, err)
 	}
 
 	// Set headers
@@ -86,30 +94,34 @@ func (c *Client) Complete(request ChatCompletionRequest) (string, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to send request: %w", err)
+		// Check if it's a timeout error
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", errors.NewLLMAPIError("request timeout", 0, err)
+		}
+		return "", errors.NewLLMAPIError("failed to send request", 0, err)
 	}
 	defer resp.Body.Close()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return "", errors.NewLLMAPIError("failed to read response", resp.StatusCode, err)
 	}
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return "", errors.NewLLMAPIError(fmt.Sprintf("API request failed: %s", string(body)), resp.StatusCode, nil)
 	}
 
 	// Parse response
 	var response ChatCompletionResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return "", errors.NewLLMAPIError("failed to unmarshal response", resp.StatusCode, err)
 	}
 
 	// Check if response has choices
 	if len(response.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+		return "", errors.NewLLMAPIError("no choices in response", resp.StatusCode, nil)
 	}
 
 	return response.Choices[0].Message.Content, nil

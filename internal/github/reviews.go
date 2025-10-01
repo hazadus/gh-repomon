@@ -22,7 +22,7 @@ func (c *Client) GetReviews(repo string, prNumber int) ([]Review, error) {
 	path := fmt.Sprintf("repos/%s/pulls/%d/reviews", repo, prNumber)
 
 	var reviews []Review
-	err := c.client.Get(path, &reviews)
+	err := c.doWithRetry("GET", path, nil, &reviews)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reviews for PR #%d: %w", prNumber, err)
 	}
@@ -84,7 +84,7 @@ func (c *Client) GetReviewsForPR(repo string, pr *types.PullRequest) error {
 	path := fmt.Sprintf("repos/%s/pulls/%d/reviews", repo, pr.Number)
 
 	var reviewsData []map[string]interface{}
-	err := c.client.Get(path, &reviewsData)
+	err := c.doWithRetry("GET", path, nil, &reviewsData)
 	if err != nil {
 		return fmt.Errorf("failed to get reviews for PR #%d: %w", pr.Number, err)
 	}

@@ -18,7 +18,7 @@ func (c *Client) GetOpenIssues(repo string) ([]types.Issue, error) {
 		path := fmt.Sprintf("repos/%s/issues?state=open&per_page=%d&page=%d", repo, perPage, page)
 		var response []map[string]interface{}
 
-		err := c.client.Get(path, &response)
+		err := c.doWithRetry("GET", path, nil, &response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open issues: %w", err)
 		}
@@ -77,7 +77,7 @@ func (c *Client) GetClosedIssues(repo, from, to string) ([]types.Issue, error) {
 		path := fmt.Sprintf("repos/%s/issues?state=closed&per_page=%d&page=%d&sort=updated&direction=desc", repo, perPage, page)
 		var response []map[string]interface{}
 
-		err := c.client.Get(path, &response)
+		err := c.doWithRetry("GET", path, nil, &response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get closed issues: %w", err)
 		}

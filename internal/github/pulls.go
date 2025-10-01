@@ -12,7 +12,7 @@ func (c *Client) GetOpenPullRequests(repo string) ([]types.PullRequest, error) {
 	path := fmt.Sprintf("repos/%s/pulls", repo)
 
 	var response []map[string]interface{}
-	err := c.client.Get(path+"?state=open&per_page=100", &response)
+	err := c.doWithRetry("GET", path+"?state=open&per_page=100", nil, &response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get open pull requests: %w", err)
 	}
@@ -40,7 +40,7 @@ func (c *Client) GetUpdatedPullRequests(repo, from, to string) ([]types.PullRequ
 	path := fmt.Sprintf("repos/%s/pulls", repo)
 
 	var response []map[string]interface{}
-	err := c.client.Get(path+"?state=all&sort=updated&direction=desc&per_page=100", &response)
+	err := c.doWithRetry("GET", path+"?state=all&sort=updated&direction=desc&per_page=100", nil, &response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get updated pull requests: %w", err)
 	}
@@ -83,7 +83,7 @@ func (c *Client) GetPullRequestComments(repo string, prNumber int) (int, error) 
 	path := fmt.Sprintf("repos/%s/pulls/%d/comments", repo, prNumber)
 
 	var response []map[string]interface{}
-	err := c.client.Get(path, &response)
+	err := c.doWithRetry("GET", path, nil, &response)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get PR comments: %w", err)
 	}

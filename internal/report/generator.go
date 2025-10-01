@@ -2,12 +2,12 @@ package report
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/hazadus/gh-repomon/internal/github"
 	"github.com/hazadus/gh-repomon/internal/llm"
+	"github.com/hazadus/gh-repomon/internal/logger"
 	"github.com/hazadus/gh-repomon/internal/types"
 )
 
@@ -15,6 +15,15 @@ import (
 type Generator struct {
 	githubClient *github.Client
 	llmClient    *llm.Client
+	logger       *logger.Logger
+}
+
+// GenerationStats holds statistics about the report generation process
+type GenerationStats struct {
+	TotalBranches       int
+	TotalAISummaries    int
+	SuccessfulSummaries int
+	FailedSummaries     int
 }
 
 // Options contains configuration for report generation
@@ -36,76 +45,92 @@ func NewGenerator(ghClient *github.Client, llmClient *llm.Client) *Generator {
 	return &Generator{
 		githubClient: ghClient,
 		llmClient:    llmClient,
+		logger:       logger.New(),
 	}
 }
 
 // Generate generates a full report based on the provided options
 func (g *Generator) Generate(opts Options) (string, error) {
+	// Initialize statistics
+	stats := &GenerationStats{}
+
 	// Collect data from GitHub
 	data, err := g.collectData(opts)
 	if err != nil {
 		return "", err
 	}
 
+	stats.TotalBranches = len(data.Branches)
+
 	// Generate AI summary if LLM client is available
 	var overallSummary string
 	if g.llmClient != nil {
-		fmt.Fprintf(os.Stderr, "Generating AI summaries...\n")
+		g.logger.Info("Generating AI summaries...")
 		summary, err := g.llmClient.GenerateOverallSummary(data, opts.Language, opts.Model)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate overall summary: %v\n", err)
+			g.logger.Warning(fmt.Sprintf("Failed to generate overall summary: %v", err))
 			overallSummary = "Summary generation failed. Please check the activity details below."
+			stats.FailedSummaries++
 		} else {
 			overallSummary = summary
-			fmt.Fprintf(os.Stderr, "  ✅ Overall summary generated\n")
+			g.logger.Success("Overall summary generated")
+			stats.SuccessfulSummaries++
 		}
+		stats.TotalAISummaries++
 
 		// Generate branch summaries
-		branchSuccessCount := 0
 		for i := range data.Branches {
 			branchSummary, err := g.llmClient.GenerateBranchSummary(&data.Branches[i], opts.Language, opts.Model)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate summary for branch %s: %v\n", data.Branches[i].Name, err)
+				g.logger.Warning(fmt.Sprintf("Failed to generate summary for branch %s: %v", data.Branches[i].Name, err))
 				data.Branches[i].AISummary = fmt.Sprintf("Development activity in branch %s", data.Branches[i].Name)
+				stats.FailedSummaries++
 			} else {
 				data.Branches[i].AISummary = branchSummary
-				branchSuccessCount++
+				stats.SuccessfulSummaries++
 			}
+			stats.TotalAISummaries++
 		}
-		fmt.Fprintf(os.Stderr, "  ✅ Branch summaries generated (%d/%d)\n", branchSuccessCount, len(data.Branches))
+		g.logger.Success(fmt.Sprintf("Branch summaries generated (%d/%d)", stats.TotalBranches-stats.FailedSummaries, stats.TotalBranches))
 
 		// Generate PR summaries for open PRs
-		prSuccessCount := 0
 		totalPRs := len(data.OpenPRs) + len(data.UpdatedPRs)
+		prSuccessCount := 0
 		for i := range data.OpenPRs {
 			prSummary, err := g.llmClient.GeneratePRSummary(&data.OpenPRs[i], opts.Language, opts.Model)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate summary for PR #%d: %v\n", data.OpenPRs[i].Number, err)
+				g.logger.Warning(fmt.Sprintf("Failed to generate summary for PR #%d: %v", data.OpenPRs[i].Number, err))
 				data.OpenPRs[i].AISummary = fmt.Sprintf("Pull request: %s", data.OpenPRs[i].Title)
+				stats.FailedSummaries++
 			} else {
 				data.OpenPRs[i].AISummary = prSummary
 				prSuccessCount++
+				stats.SuccessfulSummaries++
 			}
+			stats.TotalAISummaries++
 		}
 
 		// Generate PR summaries for updated PRs
 		for i := range data.UpdatedPRs {
 			prSummary, err := g.llmClient.GeneratePRSummary(&data.UpdatedPRs[i], opts.Language, opts.Model)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate summary for PR #%d: %v\n", data.UpdatedPRs[i].Number, err)
+				g.logger.Warning(fmt.Sprintf("Failed to generate summary for PR #%d: %v", data.UpdatedPRs[i].Number, err))
 				data.UpdatedPRs[i].AISummary = fmt.Sprintf("Pull request: %s", data.UpdatedPRs[i].Title)
+				stats.FailedSummaries++
 			} else {
 				data.UpdatedPRs[i].AISummary = prSummary
 				prSuccessCount++
+				stats.SuccessfulSummaries++
 			}
+			stats.TotalAISummaries++
 		}
-		fmt.Fprintf(os.Stderr, "  ✅ PR summaries generated (%d/%d)\n", prSuccessCount, totalPRs)
+		g.logger.Success(fmt.Sprintf("PR summaries generated (%d/%d)", prSuccessCount, totalPRs))
 	} else {
 		overallSummary = "[AI summary generation disabled]"
 	}
 
 	// Generate markdown report
-	report := g.generateMarkdown(data, overallSummary)
+	report := g.generateMarkdown(data, overallSummary, stats)
 
 	return report, nil
 }
@@ -117,21 +142,22 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 	toISO := opts.Period.To.Format(time.RFC3339)
 
 	// Get active branches
+	g.logger.Progress("Collecting branches...")
 	branches, err := g.githubClient.GetActiveBranches(opts.Repository, opts.Period.From, opts.Period.To)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprintf(os.Stderr, "  🔍 Found %d active branches\n", len(branches))
+	g.logger.Success(fmt.Sprintf("Found %d active branches", len(branches)))
 
 	// Count total commits
 	totalCommits := 0
 	for _, branch := range branches {
 		totalCommits += len(branch.Commits)
 	}
-	fmt.Fprintf(os.Stderr, "  🔍 Collecting commits... Found %d commits\n", totalCommits)
+	g.logger.Success(fmt.Sprintf("Collected %d commits", totalCommits))
 
 	// Get open pull requests
-	fmt.Fprintf(os.Stderr, "  🔍 Collecting pull requests...\n")
+	g.logger.Progress("Collecting pull requests...")
 	openPRs, err := g.githubClient.GetOpenPullRequests(opts.Repository)
 	if err != nil {
 		return nil, err
@@ -142,10 +168,10 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprintf(os.Stderr, "  🔍 Found %d open PRs, %d updated PRs\n", len(openPRs), len(updatedPRs))
+	g.logger.Success(fmt.Sprintf("Found %d open PRs, %d updated PRs", len(openPRs), len(updatedPRs)))
 
 	// Get open issues
-	fmt.Fprintf(os.Stderr, "  🔍 Collecting issues...\n")
+	g.logger.Progress("Collecting issues...")
 	openIssues, err := g.githubClient.GetOpenIssues(opts.Repository)
 	if err != nil {
 		return nil, err
@@ -156,7 +182,7 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprintf(os.Stderr, "  🔍 Found %d open issues, %d closed issues\n", len(openIssues), len(closedIssues))
+	g.logger.Success(fmt.Sprintf("Found %d open issues, %d closed issues", len(openIssues), len(closedIssues)))
 
 	// Create report data
 	data := &types.ReportData{
@@ -175,7 +201,7 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 }
 
 // generateMarkdown generates a markdown report from collected data
-func (g *Generator) generateMarkdown(data *types.ReportData, overallSummary string) string {
+func (g *Generator) generateMarkdown(data *types.ReportData, overallSummary string, stats *GenerationStats) string {
 	var sb strings.Builder
 
 	// Calculate overall statistics
@@ -213,6 +239,26 @@ func (g *Generator) generateMarkdown(data *types.ReportData, overallSummary stri
 
 	// Generate author statistics section
 	sb.WriteString(generateAuthorStatsSection(data.AuthorStats))
+
+	// Generate footer with statistics
+	sb.WriteString(generateFooter(stats))
+
+	return sb.String()
+}
+
+// generateFooter generates the report footer with generation statistics
+func generateFooter(stats *GenerationStats) string {
+	var sb strings.Builder
+
+	sb.WriteString("\n---\n\n")
+	sb.WriteString("*Generated by [gh-repomon](https://github.com/hazadus/gh-repomon)*\n\n")
+
+	if stats != nil && stats.TotalAISummaries > 0 {
+		sb.WriteString(fmt.Sprintf("*AI Summaries: %d successful, %d failed (total %d)*\n",
+			stats.SuccessfulSummaries,
+			stats.FailedSummaries,
+			stats.TotalAISummaries))
+	}
 
 	return sb.String()
 }

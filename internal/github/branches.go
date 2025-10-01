@@ -22,9 +22,9 @@ func (c *Client) GetBranches(repo string) ([]string, error) {
 	// Build API path
 	path := fmt.Sprintf("repos/%s/branches", repo)
 
-	// Make API request
+	// Make API request with retry
 	var response []branchResponse
-	err := c.client.Get(path, &response)
+	err := c.doWithRetry("GET", path, nil, &response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get branches: %w", err)
 	}
