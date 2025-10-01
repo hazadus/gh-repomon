@@ -12,7 +12,7 @@ build:
 
 # Format code
 format:
-    go fmt ./...
+    gofmt -s -w .
 
 # Run linter
 lint:
