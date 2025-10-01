@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/hazadus/gh-repomon/internal/github"
+	"github.com/hazadus/gh-repomon/internal/report"
+	"github.com/hazadus/gh-repomon/internal/types"
 	"github.com/spf13/cobra"
 )
 
@@ -81,189 +83,36 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
-	// Output parameters to stderr for verification
+	// Output progress to stderr
 	fmt.Fprintf(os.Stderr, "Connected to GitHub API\n")
-	fmt.Fprintf(os.Stderr, "Repository: %s\n", repo)
-	fmt.Fprintf(os.Stderr, "Period: %s to %s\n", from.Format("2006-01-02"), to.Format("2006-01-02"))
-	fmt.Fprintf(os.Stderr, "Days: %d\n", days)
-	if user != "" {
-		fmt.Fprintf(os.Stderr, "Filter by user: %s\n", user)
-	}
-	fmt.Fprintf(os.Stderr, "Exclude bots: %v\n", excludeBots)
-	fmt.Fprintf(os.Stderr, "Model: %s\n", model)
-	fmt.Fprintf(os.Stderr, "Language: %s\n", language)
-	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "Analyzing repository %s (%s to %s)\n",
+		repo,
+		from.Format("2006-01-02"),
+		to.Format("2006-01-02"))
 
-	// Get active branches
-	fmt.Fprintf(os.Stderr, "Fetching active branches...\n")
-	branches, err := ghClient.GetActiveBranches(repo, from, to)
+	// Create report options
+	opts := report.Options{
+		Repository: repo,
+		Period: types.Period{
+			From: from,
+			To:   to,
+		},
+		User:     user,
+		Model:    model,
+		Language: language,
+	}
+
+	// Create report generator
+	generator := report.NewGenerator(ghClient)
+
+	// Generate report
+	reportText, err := generator.Generate(opts)
 	if err != nil {
-		return fmt.Errorf("failed to get active branches: %w", err)
+		return fmt.Errorf("failed to generate report: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "Found %d active branches\n\n", len(branches))
-
-	// Display information for each branch
-	for _, branch := range branches {
-		fmt.Fprintf(os.Stderr, "Branch: %s\n", branch.Name)
-		fmt.Fprintf(os.Stderr, "  Commits: %d\n", len(branch.Commits))
-		fmt.Fprintf(os.Stderr, "  Total Added: +%d lines\n", branch.TotalAdded)
-		fmt.Fprintf(os.Stderr, "  Total Deleted: -%d lines\n", branch.TotalDeleted)
-		fmt.Fprintf(os.Stderr, "  Authors: %v\n", branch.Authors)
-		fmt.Fprintf(os.Stderr, "\n")
-	}
-
-	// Get open pull requests
-	fmt.Fprintf(os.Stderr, "Fetching open pull requests...\n")
-	openPRs, err := ghClient.GetOpenPullRequests(repo)
-	if err != nil {
-		return fmt.Errorf("failed to get open pull requests: %w", err)
-	}
-
-	fmt.Fprintf(os.Stderr, "Found %d open pull requests\n", len(openPRs))
-
-	// Get updated pull requests
-	fmt.Fprintf(os.Stderr, "Fetching updated pull requests...\n")
-	fromISO := from.Format(time.RFC3339)
-	toISO := to.Format(time.RFC3339)
-	updatedPRs, err := ghClient.GetUpdatedPullRequests(repo, fromISO, toISO)
-	if err != nil {
-		return fmt.Errorf("failed to get updated pull requests: %w", err)
-	}
-
-	fmt.Fprintf(os.Stderr, "Found %d updated pull requests\n\n", len(updatedPRs))
-
-	// Display first 3 open PRs for verification
-	fmt.Fprintf(os.Stderr, "Sample Open PRs:\n")
-	for i, pr := range openPRs {
-		if i >= 3 {
-			break
-		}
-		fmt.Fprintf(os.Stderr, "  PR #%d: %s\n", pr.Number, pr.Title)
-		fmt.Fprintf(os.Stderr, "    Author: %s\n", pr.Author.Login)
-		fmt.Fprintf(os.Stderr, "    State: %s\n", pr.State)
-		fmt.Fprintf(os.Stderr, "    Created: %s\n", pr.CreatedAt.Format("2006-01-02"))
-		fmt.Fprintf(os.Stderr, "    Comments: %d\n", pr.Comments)
-		fmt.Fprintf(os.Stderr, "\n")
-	}
-
-	// Display first 3 updated PRs for verification
-	if len(updatedPRs) > 0 {
-		fmt.Fprintf(os.Stderr, "Sample Updated PRs:\n")
-		for i, pr := range updatedPRs {
-			if i >= 3 {
-				break
-			}
-			fmt.Fprintf(os.Stderr, "  PR #%d: %s\n", pr.Number, pr.Title)
-			fmt.Fprintf(os.Stderr, "    Author: %s\n", pr.Author.Login)
-			fmt.Fprintf(os.Stderr, "    Updated: %s\n", pr.UpdatedAt.Format("2006-01-02"))
-			fmt.Fprintf(os.Stderr, "\n")
-		}
-	}
-
-	// Get open issues
-	fmt.Fprintf(os.Stderr, "Fetching open issues...\n")
-	openIssues, err := ghClient.GetOpenIssues(repo)
-	if err != nil {
-		return fmt.Errorf("failed to get open issues: %w", err)
-	}
-
-	fmt.Fprintf(os.Stderr, "Found %d open issues\n", len(openIssues))
-
-	// Get closed issues
-	fmt.Fprintf(os.Stderr, "Fetching closed issues...\n")
-	closedIssues, err := ghClient.GetClosedIssues(repo, fromISO, toISO)
-	if err != nil {
-		return fmt.Errorf("failed to get closed issues: %w", err)
-	}
-
-	fmt.Fprintf(os.Stderr, "Found %d closed issues\n\n", len(closedIssues))
-
-	// Display first 3 open issues for verification
-	if len(openIssues) > 0 {
-		fmt.Fprintf(os.Stderr, "Sample Open Issues:\n")
-		for i, issue := range openIssues {
-			if i >= 3 {
-				break
-			}
-			fmt.Fprintf(os.Stderr, "  Issue #%d: %s\n", issue.Number, issue.Title)
-			fmt.Fprintf(os.Stderr, "    Author: %s\n", issue.Author.Login)
-			fmt.Fprintf(os.Stderr, "    State: %s\n", issue.State)
-			fmt.Fprintf(os.Stderr, "    Created: %s\n", issue.CreatedAt.Format("2006-01-02"))
-			if len(issue.Labels) > 0 {
-				fmt.Fprintf(os.Stderr, "    Labels: %v\n", issue.Labels)
-			}
-			fmt.Fprintf(os.Stderr, "\n")
-		}
-	}
-
-	// Display first 3 closed issues for verification
-	if len(closedIssues) > 0 {
-		fmt.Fprintf(os.Stderr, "Sample Closed Issues:\n")
-		for i, issue := range closedIssues {
-			if i >= 3 {
-				break
-			}
-			fmt.Fprintf(os.Stderr, "  Issue #%d: %s\n", issue.Number, issue.Title)
-			fmt.Fprintf(os.Stderr, "    Author: %s\n", issue.Author.Login)
-			if issue.ClosedAt != nil {
-				fmt.Fprintf(os.Stderr, "    Closed: %s\n", issue.ClosedAt.Format("2006-01-02"))
-			}
-			fmt.Fprintf(os.Stderr, "\n")
-		}
-	}
-
-	// Get code review statistics
-	fmt.Fprintf(os.Stderr, "Fetching code review statistics...\n")
-
-	// Combine all PRs for review analysis
-	allPRs := append(openPRs[:0:0], openPRs...)
-	allPRs = append(allPRs, updatedPRs...)
-
-	// Get total review count
-	totalReviews, err := ghClient.GetAllReviews(repo, allPRs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to get reviews: %v\n", err)
-	} else {
-		fmt.Fprintf(os.Stderr, "Found %d total reviews\n", totalReviews)
-	}
-
-	// Get reviews grouped by author
-	reviewsByAuthor, err := ghClient.GetReviewsByAuthor(repo, allPRs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to get reviews by author: %v\n", err)
-	} else {
-		fmt.Fprintf(os.Stderr, "\nTop Reviewers:\n")
-
-		// Sort reviewers by count (simple bubble sort for top 3)
-		type reviewer struct {
-			login string
-			count int
-		}
-
-		reviewers := make([]reviewer, 0, len(reviewsByAuthor))
-		for login, count := range reviewsByAuthor {
-			reviewers = append(reviewers, reviewer{login: login, count: count})
-		}
-
-		// Simple sort by count (descending)
-		for i := 0; i < len(reviewers); i++ {
-			for j := i + 1; j < len(reviewers); j++ {
-				if reviewers[j].count > reviewers[i].count {
-					reviewers[i], reviewers[j] = reviewers[j], reviewers[i]
-				}
-			}
-		}
-
-		// Display top 3
-		for i, r := range reviewers {
-			if i >= 3 {
-				break
-			}
-			fmt.Fprintf(os.Stderr, "  %d. %s - %d reviews\n", i+1, r.login, r.count)
-		}
-		fmt.Fprintf(os.Stderr, "\n")
-	}
+	// Output report to stdout
+	fmt.Println(reportText)
 
 	return nil
 }
