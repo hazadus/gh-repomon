@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Build binaries
+      run: |
+        mkdir -p dist
+
+        # Linux AMD64
+        GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ steps.get_version.outputs.VERSION }}" -o dist/gh-repomon-linux-amd64 ./cmd/repomon
+
+        # Linux ARM64
+        GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ steps.get_version.outputs.VERSION }}" -o dist/gh-repomon-linux-arm64 ./cmd/repomon
+
+        # macOS AMD64 (Intel)
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ steps.get_version.outputs.VERSION }}" -o dist/gh-repomon-darwin-amd64 ./cmd/repomon
+
+        # macOS ARM64 (Apple Silicon)
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ steps.get_version.outputs.VERSION }}" -o dist/gh-repomon-darwin-arm64 ./cmd/repomon
+
+        # Windows AMD64
+        GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ steps.get_version.outputs.VERSION }}" -o dist/gh-repomon-windows-amd64.exe ./cmd/repomon
+
+        # Windows ARM64
+        GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ steps.get_version.outputs.VERSION }}" -o dist/gh-repomon-windows-arm64.exe ./cmd/repomon
+
+    - name: Generate checksums
+      run: |
+        cd dist
+        sha256sum * > checksums.txt
+        cat checksums.txt
+
+    - name: Extract release notes
+      id: extract_notes
+      run: |
+        # Extract release notes from CHANGELOG.md for this version
+        if [ -f CHANGELOG.md ]; then
+          # Try to extract notes for this version
+          awk '/^## \['${{ steps.get_version.outputs.VERSION }}'\]/,/^## \[/' CHANGELOG.md | head -n -1 | tail -n +2 > release_notes.txt
+
+          # If no notes found, use a default message
+          if [ ! -s release_notes.txt ]; then
+            echo "Release version ${{ steps.get_version.outputs.VERSION }}" > release_notes.txt
+            echo "" >> release_notes.txt
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details." >> release_notes.txt
+          fi
+        else
+          echo "Release version ${{ steps.get_version.outputs.VERSION }}" > release_notes.txt
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/gh-repomon-linux-amd64
+          dist/gh-repomon-linux-arm64
+          dist/gh-repomon-darwin-amd64
+          dist/gh-repomon-darwin-arm64
+          dist/gh-repomon-windows-amd64.exe
+          dist/gh-repomon-windows-arm64.exe
+          dist/checksums.txt
+        body_path: release_notes.txt
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update latest tag
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git tag -fa latest -m "Latest release"
+        git push origin latest --force

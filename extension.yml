@@ -1,1 +1,4 @@
 name: repomon
+owner: hazadus
+description: GitHub Repository Activity Monitor - Generate comprehensive reports on repository activity with AI-powered summaries
+version: 1.0.0

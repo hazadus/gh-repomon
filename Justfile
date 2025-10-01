@@ -49,13 +49,33 @@ deps:
 
 # Build for all platforms
 build-all:
-    GOOS=linux GOARCH=amd64 go build -o bin/gh-repomon-linux-amd64 ./cmd/repomon
-    GOOS=linux GOARCH=arm64 go build -o bin/gh-repomon-linux-arm64 ./cmd/repomon
-    GOOS=darwin GOARCH=amd64 go build -o bin/gh-repomon-darwin-amd64 ./cmd/repomon
-    GOOS=darwin GOARCH=arm64 go build -o bin/gh-repomon-darwin-arm64 ./cmd/repomon
-    GOOS=windows GOARCH=amd64 go build -o bin/gh-repomon-windows-amd64.exe ./cmd/repomon
-    GOOS=windows GOARCH=arm64 go build -o bin/gh-repomon-windows-arm64.exe ./cmd/repomon
-    @echo "Built binaries for all platforms in bin/"
+    @echo "Building binaries for all platforms..."
+    @mkdir -p bin
+    GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/gh-repomon-linux-amd64 ./cmd/repomon
+    GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o bin/gh-repomon-linux-arm64 ./cmd/repomon
+    GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/gh-repomon-darwin-amd64 ./cmd/repomon
+    GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/gh-repomon-darwin-arm64 ./cmd/repomon
+    GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/gh-repomon-windows-amd64.exe ./cmd/repomon
+    GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o bin/gh-repomon-windows-arm64.exe ./cmd/repomon
+    @echo "✓ Built binaries for all platforms in bin/"
+
+# Create a local release build with checksums
+release:
+    @echo "Creating local release build..."
+    @just clean
+    @just test
+    @just build-all
+    @cd bin && sha256sum * > checksums.txt
+    @echo "✓ Release build created in bin/ with checksums"
+    @echo ""
+    @echo "Files created:"
+    @ls -lh bin/
+
+# Test goreleaser configuration without publishing
+release-test:
+    @echo "Testing goreleaser configuration..."
+    goreleaser release --snapshot --clean
+    @echo "✓ Test release created in dist/"
 
 # Generate commit message (see https://github.com/hazadus/gh-commitmsg)
 commitmsg:
