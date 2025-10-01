@@ -10,13 +10,27 @@ import (
 
 // Logger provides structured logging to stderr
 type Logger struct {
-	output io.Writer
+	output  io.Writer
+	verbose bool
 }
 
 // New creates a new Logger instance
 func New() *Logger {
 	return &Logger{
-		output: os.Stderr,
+		output:  os.Stderr,
+		verbose: false,
+	}
+}
+
+// SetVerbose enables or disables verbose logging
+func (l *Logger) SetVerbose(verbose bool) {
+	l.verbose = verbose
+}
+
+// Debug logs a debug message (only shown in verbose mode)
+func (l *Logger) Debug(message string) {
+	if l.verbose {
+		l.log("DEBUG", message, "🔧 ")
 	}
 }
 

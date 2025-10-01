@@ -3,8 +3,10 @@ module github.com/hazadus/gh-repomon
 go 1.23.4
 
 require (
-	github.com/cli/go-gh/v2 v2.12.2
+	github.com/cli/go-gh/v2 v2.11.1
 	github.com/spf13/cobra v1.10.1
+	golang.org/x/sync v0.7.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -22,6 +24,5 @@ require (
 	github.com/thlib/go-timezone-local v0.0.0-20210907160436-ef149e42d28e // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	golang.org/x/text v0.16.0 // indirect
 )

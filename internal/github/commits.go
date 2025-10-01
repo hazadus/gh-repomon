@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hazadus/gh-repomon/internal/types"
@@ -50,47 +51,76 @@ func (c *Client) GetCommits(repo, branch string, from, to time.Time) ([]types.Co
 		return nil, fmt.Errorf("failed to get commits: %w", err)
 	}
 
-	// Convert to types.Commit
+	// Convert to types.Commit with parallel stats fetching
 	commits := make([]types.Commit, 0, len(response))
-	for _, cr := range response {
-		// Check if we should filter out bots
-		if c.excludeBots && cr.Author.Login != "" && c.isBot(cr.Author.Login) {
-			continue
-		}
+	commitsMutex := sync.Mutex{}
 
-		// Get detailed commit stats
-		additions, deletions, err := c.GetCommitStats(repo, cr.SHA)
-		if err != nil {
-			// If we can't get stats, use zeros but don't fail
-			additions = 0
-			deletions = 0
-		}
-
-		// Create Author
-		author := types.Author{
-			Login:      cr.Author.Login,
-			Name:       cr.Commit.Author.Name,
-			ProfileURL: cr.Author.HTMLURL,
-			IsBot:      c.isBot(cr.Author.Login),
-		}
-
-		// If author.Login is empty (deleted user), use name
-		if author.Login == "" {
-			author.Login = cr.Commit.Author.Name
-		}
-
-		commit := types.Commit{
-			SHA:       cr.SHA,
-			Message:   cr.Commit.Message,
-			Author:    author,
-			Date:      cr.Commit.Author.Date,
-			Additions: additions,
-			Deletions: deletions,
-			URL:       cr.HTMLURL,
-		}
-
-		commits = append(commits, commit)
+	// Worker pool for fetching commit stats
+	maxWorkers := 10
+	if len(response) < maxWorkers {
+		maxWorkers = len(response)
 	}
+
+	commitChan := make(chan commitResponse, len(response))
+	var wg sync.WaitGroup
+
+	// Start workers
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for cr := range commitChan {
+				// Check if we should filter out bots
+				if c.excludeBots && cr.Author.Login != "" && c.isBot(cr.Author.Login) {
+					continue
+				}
+
+				// Get detailed commit stats
+				additions, deletions, err := c.GetCommitStats(repo, cr.SHA)
+				if err != nil {
+					// If we can't get stats, use zeros but don't fail
+					additions = 0
+					deletions = 0
+				}
+
+				// Create Author
+				author := types.Author{
+					Login:      cr.Author.Login,
+					Name:       cr.Commit.Author.Name,
+					ProfileURL: cr.Author.HTMLURL,
+					IsBot:      c.isBot(cr.Author.Login),
+				}
+
+				// If author.Login is empty (deleted user), use name
+				if author.Login == "" {
+					author.Login = cr.Commit.Author.Name
+				}
+
+				commit := types.Commit{
+					SHA:       cr.SHA,
+					Message:   cr.Commit.Message,
+					Author:    author,
+					Date:      cr.Commit.Author.Date,
+					Additions: additions,
+					Deletions: deletions,
+					URL:       cr.HTMLURL,
+				}
+
+				commitsMutex.Lock()
+				commits = append(commits, commit)
+				commitsMutex.Unlock()
+			}
+		}()
+	}
+
+	// Send commits to workers
+	for _, cr := range response {
+		commitChan <- cr
+	}
+	close(commitChan)
+
+	// Wait for all workers to finish
+	wg.Wait()
 
 	return commits, nil
 }

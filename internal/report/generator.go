@@ -3,12 +3,16 @@ package report
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/hazadus/gh-repomon/internal/github"
 	"github.com/hazadus/gh-repomon/internal/llm"
 	"github.com/hazadus/gh-repomon/internal/logger"
 	"github.com/hazadus/gh-repomon/internal/types"
+	"github.com/hazadus/gh-repomon/internal/utils"
 )
 
 // Generator generates reports based on GitHub activity data
@@ -78,52 +82,97 @@ func (g *Generator) Generate(opts Options) (string, error) {
 		}
 		stats.TotalAISummaries++
 
-		// Generate branch summaries
-		for i := range data.Branches {
-			branchSummary, err := g.llmClient.GenerateBranchSummary(&data.Branches[i], opts.Language, opts.Model)
-			if err != nil {
-				g.logger.Warning(fmt.Sprintf("Failed to generate summary for branch %s: %v", data.Branches[i].Name, err))
-				data.Branches[i].AISummary = fmt.Sprintf("Development activity in branch %s", data.Branches[i].Name)
-				stats.FailedSummaries++
-			} else {
-				data.Branches[i].AISummary = branchSummary
-				stats.SuccessfulSummaries++
-			}
-			stats.TotalAISummaries++
-		}
-		g.logger.Success(fmt.Sprintf("Branch summaries generated (%d/%d)", stats.TotalBranches-stats.FailedSummaries, stats.TotalBranches))
+		// Generate branch summaries in parallel with rate limiting
+		maxWorkers := 5 // Limit concurrent LLM requests
+		branchSummaryErrors := 0
 
-		// Generate PR summaries for open PRs
+		err = utils.ProcessInParallel(data.Branches, maxWorkers, func(branch types.Branch) error {
+			branchSummary, err := g.llmClient.GenerateBranchSummary(&branch, opts.Language, opts.Model)
+
+			// Find the branch in data.Branches and update it
+			for i := range data.Branches {
+				if data.Branches[i].Name == branch.Name {
+					if err != nil {
+						g.logger.Warning(fmt.Sprintf("Failed to generate summary for branch %s: %v", branch.Name, err))
+						data.Branches[i].AISummary = fmt.Sprintf("Development activity in branch %s", branch.Name)
+						branchSummaryErrors++
+					} else {
+						data.Branches[i].AISummary = branchSummary
+					}
+					stats.TotalAISummaries++
+					break
+				}
+			}
+
+			// Don't fail the entire process if one summary fails
+			return nil
+		})
+
+		if err != nil {
+			g.logger.Warning(fmt.Sprintf("Error generating branch summaries: %v", err))
+		}
+
+		stats.SuccessfulSummaries += (stats.TotalBranches - branchSummaryErrors)
+		stats.FailedSummaries += branchSummaryErrors
+		g.logger.Success(fmt.Sprintf("Branch summaries generated (%d/%d)", stats.TotalBranches-branchSummaryErrors, stats.TotalBranches))
+
+		// Generate PR summaries in parallel
 		totalPRs := len(data.OpenPRs) + len(data.UpdatedPRs)
 		prSuccessCount := 0
-		for i := range data.OpenPRs {
-			prSummary, err := g.llmClient.GeneratePRSummary(&data.OpenPRs[i], opts.Language, opts.Model)
-			if err != nil {
-				g.logger.Warning(fmt.Sprintf("Failed to generate summary for PR #%d: %v", data.OpenPRs[i].Number, err))
-				data.OpenPRs[i].AISummary = fmt.Sprintf("Pull request: %s", data.OpenPRs[i].Title)
-				stats.FailedSummaries++
-			} else {
-				data.OpenPRs[i].AISummary = prSummary
-				prSuccessCount++
-				stats.SuccessfulSummaries++
+		prErrors := 0
+
+		// Generate summaries for open PRs
+		err = utils.ProcessInParallel(data.OpenPRs, maxWorkers, func(pr types.PullRequest) error {
+			prSummary, err := g.llmClient.GeneratePRSummary(&pr, opts.Language, opts.Model)
+
+			for i := range data.OpenPRs {
+				if data.OpenPRs[i].Number == pr.Number {
+					if err != nil {
+						g.logger.Warning(fmt.Sprintf("Failed to generate summary for PR #%d: %v", pr.Number, err))
+						data.OpenPRs[i].AISummary = fmt.Sprintf("Pull request: %s", pr.Title)
+						prErrors++
+					} else {
+						data.OpenPRs[i].AISummary = prSummary
+						prSuccessCount++
+					}
+					stats.TotalAISummaries++
+					break
+				}
 			}
-			stats.TotalAISummaries++
+			return nil
+		})
+
+		if err != nil {
+			g.logger.Warning(fmt.Sprintf("Error generating open PR summaries: %v", err))
 		}
 
-		// Generate PR summaries for updated PRs
-		for i := range data.UpdatedPRs {
-			prSummary, err := g.llmClient.GeneratePRSummary(&data.UpdatedPRs[i], opts.Language, opts.Model)
-			if err != nil {
-				g.logger.Warning(fmt.Sprintf("Failed to generate summary for PR #%d: %v", data.UpdatedPRs[i].Number, err))
-				data.UpdatedPRs[i].AISummary = fmt.Sprintf("Pull request: %s", data.UpdatedPRs[i].Title)
-				stats.FailedSummaries++
-			} else {
-				data.UpdatedPRs[i].AISummary = prSummary
-				prSuccessCount++
-				stats.SuccessfulSummaries++
+		// Generate summaries for updated PRs
+		err = utils.ProcessInParallel(data.UpdatedPRs, maxWorkers, func(pr types.PullRequest) error {
+			prSummary, err := g.llmClient.GeneratePRSummary(&pr, opts.Language, opts.Model)
+
+			for i := range data.UpdatedPRs {
+				if data.UpdatedPRs[i].Number == pr.Number {
+					if err != nil {
+						g.logger.Warning(fmt.Sprintf("Failed to generate summary for PR #%d: %v", pr.Number, err))
+						data.UpdatedPRs[i].AISummary = fmt.Sprintf("Pull request: %s", pr.Title)
+						prErrors++
+					} else {
+						data.UpdatedPRs[i].AISummary = prSummary
+						prSuccessCount++
+					}
+					stats.TotalAISummaries++
+					break
+				}
 			}
-			stats.TotalAISummaries++
+			return nil
+		})
+
+		if err != nil {
+			g.logger.Warning(fmt.Sprintf("Error generating updated PR summaries: %v", err))
 		}
+
+		stats.SuccessfulSummaries += prSuccessCount
+		stats.FailedSummaries += prErrors
 		g.logger.Success(fmt.Sprintf("PR summaries generated (%d/%d)", prSuccessCount, totalPRs))
 	} else {
 		overallSummary = "[AI summary generation disabled]"
@@ -135,53 +184,94 @@ func (g *Generator) Generate(opts Options) (string, error) {
 	return report, nil
 }
 
-// collectData collects all necessary data from GitHub API
+// collectData collects all necessary data from GitHub API in parallel
 func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 	// Convert times to ISO8601 format for API calls
 	fromISO := opts.Period.From.Format(time.RFC3339)
 	toISO := opts.Period.To.Format(time.RFC3339)
 
+	// Use errgroup for parallel data collection
+	var eg errgroup.Group
+	var branches []types.Branch
+	var openPRs, updatedPRs []types.PullRequest
+	var openIssues, closedIssues []types.Issue
+	var mu sync.Mutex
+
 	// Get active branches
 	g.logger.Progress("Collecting branches...")
-	branches, err := g.githubClient.GetActiveBranches(opts.Repository, opts.Period.From, opts.Period.To)
-	if err != nil {
+	eg.Go(func() error {
+		b, err := g.githubClient.GetActiveBranches(opts.Repository, opts.Period.From, opts.Period.To)
+		if err != nil {
+			return err
+		}
+		mu.Lock()
+		branches = b
+		mu.Unlock()
+		return nil
+	})
+
+	// Get open and updated pull requests
+	g.logger.Progress("Collecting pull requests...")
+	eg.Go(func() error {
+		prs, err := g.githubClient.GetOpenPullRequests(opts.Repository)
+		if err != nil {
+			return err
+		}
+		mu.Lock()
+		openPRs = prs
+		mu.Unlock()
+		return nil
+	})
+
+	eg.Go(func() error {
+		prs, err := g.githubClient.GetUpdatedPullRequests(opts.Repository, fromISO, toISO)
+		if err != nil {
+			return err
+		}
+		mu.Lock()
+		updatedPRs = prs
+		mu.Unlock()
+		return nil
+	})
+
+	// Get open and closed issues
+	g.logger.Progress("Collecting issues...")
+	eg.Go(func() error {
+		issues, err := g.githubClient.GetOpenIssues(opts.Repository)
+		if err != nil {
+			return err
+		}
+		mu.Lock()
+		openIssues = issues
+		mu.Unlock()
+		return nil
+	})
+
+	eg.Go(func() error {
+		issues, err := g.githubClient.GetClosedIssues(opts.Repository, fromISO, toISO)
+		if err != nil {
+			return err
+		}
+		mu.Lock()
+		closedIssues = issues
+		mu.Unlock()
+		return nil
+	})
+
+	// Wait for all goroutines to complete
+	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
+
+	// Log results
 	g.logger.Success(fmt.Sprintf("Found %d active branches", len(branches)))
 
-	// Count total commits
 	totalCommits := 0
 	for _, branch := range branches {
 		totalCommits += len(branch.Commits)
 	}
 	g.logger.Success(fmt.Sprintf("Collected %d commits", totalCommits))
-
-	// Get open pull requests
-	g.logger.Progress("Collecting pull requests...")
-	openPRs, err := g.githubClient.GetOpenPullRequests(opts.Repository)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get updated pull requests
-	updatedPRs, err := g.githubClient.GetUpdatedPullRequests(opts.Repository, fromISO, toISO)
-	if err != nil {
-		return nil, err
-	}
 	g.logger.Success(fmt.Sprintf("Found %d open PRs, %d updated PRs", len(openPRs), len(updatedPRs)))
-
-	// Get open issues
-	g.logger.Progress("Collecting issues...")
-	openIssues, err := g.githubClient.GetOpenIssues(opts.Repository)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get closed issues
-	closedIssues, err := g.githubClient.GetClosedIssues(opts.Repository, fromISO, toISO)
-	if err != nil {
-		return nil, err
-	}
 	g.logger.Success(fmt.Sprintf("Found %d open issues, %d closed issues", len(openIssues), len(closedIssues)))
 
 	// Create report data

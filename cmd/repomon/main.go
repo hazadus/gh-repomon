@@ -23,6 +23,8 @@ var (
 	excludeBots bool
 	model       string
 	language    string
+	noAI        bool
+	verbose     bool
 )
 
 var rootCmd = &cobra.Command{
@@ -45,11 +47,16 @@ func init() {
 	rootCmd.Flags().BoolVar(&excludeBots, "exclude-bots", false, "Exclude bot accounts")
 	rootCmd.Flags().StringVarP(&model, "model", "m", "gpt-4o", "AI model to use")
 	rootCmd.Flags().StringVarP(&language, "language", "l", "english", "Output language")
+	rootCmd.Flags().BoolVar(&noAI, "no-ai", false, "Disable AI summary generation (faster)")
+	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose logging")
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	// Create logger
+	// Create logger with verbose setting
 	log := logger.New()
+	if verbose {
+		log.SetVerbose(true)
+	}
 
 	// Validate that --repo is provided
 	if repo == "" {
@@ -91,14 +98,20 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	log.Success("Connected to GitHub API")
 
-	// Create LLM client
-	log.Info("Connecting to LLM API...")
-	llmClient, err := llm.NewClient()
-	if err != nil {
-		log.Warning("Failed to create LLM client, AI summaries will be disabled")
+	// Create LLM client (unless --no-ai is specified)
+	var llmClient *llm.Client
+	if noAI {
+		log.Info("AI summary generation disabled (--no-ai)")
 		llmClient = nil
 	} else {
-		log.Success("Connected to LLM API")
+		log.Info("Connecting to LLM API...")
+		llmClient, err = llm.NewClient()
+		if err != nil {
+			log.Warning("Failed to create LLM client, AI summaries will be disabled")
+			llmClient = nil
+		} else {
+			log.Success("Connected to LLM API")
+		}
 	}
 
 	log.Info(fmt.Sprintf("Analyzing repository %s (%s to %s)",
