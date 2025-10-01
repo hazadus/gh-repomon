@@ -92,9 +92,35 @@ func run(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stderr, "Exclude bots: %v\n", excludeBots)
 	fmt.Fprintf(os.Stderr, "Model: %s\n", model)
 	fmt.Fprintf(os.Stderr, "Language: %s\n", language)
+	fmt.Fprintf(os.Stderr, "\n")
 
-	// Suppress unused variable warning for now
-	_ = ghClient
+	// Get commits for main branch
+	fmt.Fprintf(os.Stderr, "Fetching commits from main branch...\n")
+	commits, err := ghClient.GetCommits(repo, "main", from, to)
+	if err != nil {
+		return fmt.Errorf("failed to get commits: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Found %d commits\n", len(commits))
+
+	// Display first 3 commits with statistics
+	displayCount := 3
+	if len(commits) < displayCount {
+		displayCount = len(commits)
+	}
+
+	if displayCount > 0 {
+		fmt.Fprintf(os.Stderr, "\nFirst %d commits:\n", displayCount)
+		for i := 0; i < displayCount; i++ {
+			commit := commits[i]
+			fmt.Fprintf(os.Stderr, "  %s - %s\n", commit.SHA[:7], commit.Message)
+			fmt.Fprintf(os.Stderr, "    Author: %s (%s)\n", commit.Author.Name, commit.Author.Login)
+			fmt.Fprintf(os.Stderr, "    Date: %s\n", commit.Date.Format("2006-01-02 15:04:05"))
+			fmt.Fprintf(os.Stderr, "    Stats: +%d/-%d lines\n", commit.Additions, commit.Deletions)
+			fmt.Fprintf(os.Stderr, "    URL: %s\n", commit.URL)
+			fmt.Fprintf(os.Stderr, "\n")
+		}
+	}
 
 	return nil
 }
