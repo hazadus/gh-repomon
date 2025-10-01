@@ -123,6 +123,9 @@ func (g *Generator) generateMarkdown(data *types.ReportData) string {
 	// Calculate overall statistics
 	data.OverallStats = calculateOverallStats(data)
 
+	// Calculate author statistics
+	data.AuthorStats = calculateAuthorStats(data)
+
 	// Generate header
 	sb.WriteString(generateHeader(data))
 
@@ -146,9 +149,11 @@ func (g *Generator) generateMarkdown(data *types.ReportData) string {
 	sb.WriteString(generateOpenIssuesSection(data.OpenIssues))
 	sb.WriteString(generateClosedIssuesSection(data.ClosedIssues))
 
-	// Placeholder for remaining sections
-	sb.WriteString("---\n\n")
-	sb.WriteString("*More sections (Code Reviews, Author Stats) will be added in the next steps*\n")
+	// Generate code reviews section
+	sb.WriteString(generateCodeReviewsSection(data))
+
+	// Generate author statistics section
+	sb.WriteString(generateAuthorStatsSection(data.AuthorStats))
 
 	return sb.String()
 }

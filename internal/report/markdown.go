@@ -299,3 +299,220 @@ func generateClosedIssuesSection(issues []types.Issue) string {
 
 	return sb.String()
 }
+
+// calculateAuthorStats calculates statistics per author from collected data
+func calculateAuthorStats(data *types.ReportData) []types.AuthorStats {
+	// Map to accumulate statistics by author login
+	authorMap := make(map[string]*types.AuthorStats)
+
+	// Process all commits in all branches
+	for _, branch := range data.Branches {
+		for _, commit := range branch.Commits {
+			login := commit.Author.Login
+
+			// Initialize author stats if not exists
+			if _, exists := authorMap[login]; !exists {
+				authorMap[login] = &types.AuthorStats{
+					Author:         commit.Author,
+					BranchActivity: make(map[string]types.BranchActivity),
+				}
+			}
+
+			stats := authorMap[login]
+
+			// Update overall stats
+			stats.TotalCommits++
+			stats.TotalAdded += commit.Additions
+			stats.TotalDeleted += commit.Deletions
+
+			// Update branch activity
+			branchActivity := stats.BranchActivity[branch.Name]
+			branchActivity.Commits++
+			branchActivity.Added += commit.Additions
+			branchActivity.Deleted += commit.Deletions
+			stats.BranchActivity[branch.Name] = branchActivity
+		}
+	}
+
+	// Process PRs
+	for _, pr := range data.OpenPRs {
+		login := pr.Author.Login
+		if stats, exists := authorMap[login]; exists {
+			stats.PRsCreated++
+		} else {
+			authorMap[login] = &types.AuthorStats{
+				Author:         pr.Author,
+				PRsCreated:     1,
+				BranchActivity: make(map[string]types.BranchActivity),
+			}
+		}
+	}
+
+	// Process updated PRs (avoid double counting open PRs)
+	for _, pr := range data.UpdatedPRs {
+		isOpen := false
+		for _, openPR := range data.OpenPRs {
+			if openPR.Number == pr.Number {
+				isOpen = true
+				break
+			}
+		}
+		if !isOpen {
+			login := pr.Author.Login
+			if stats, exists := authorMap[login]; exists {
+				stats.PRsCreated++
+			} else {
+				authorMap[login] = &types.AuthorStats{
+					Author:         pr.Author,
+					PRsCreated:     1,
+					BranchActivity: make(map[string]types.BranchActivity),
+				}
+			}
+		}
+	}
+
+	// Process Issues
+	for _, issue := range data.OpenIssues {
+		login := issue.Author.Login
+		if stats, exists := authorMap[login]; exists {
+			stats.IssuesCreated++
+		} else {
+			authorMap[login] = &types.AuthorStats{
+				Author:         issue.Author,
+				IssuesCreated:  1,
+				BranchActivity: make(map[string]types.BranchActivity),
+			}
+		}
+	}
+
+	for _, issue := range data.ClosedIssues {
+		login := issue.Author.Login
+		if stats, exists := authorMap[login]; exists {
+			stats.IssuesCreated++
+		} else {
+			authorMap[login] = &types.AuthorStats{
+				Author:         issue.Author,
+				IssuesCreated:  1,
+				BranchActivity: make(map[string]types.BranchActivity),
+			}
+		}
+	}
+
+	// Note: ReviewsCount will be populated when review functionality is added
+	// In a real implementation, we would query actual reviewers from GitHub API
+	// For now, this is just structural preparation for future enhancement
+
+	// Convert map to slice and sort by total commits (descending)
+	result := make([]types.AuthorStats, 0, len(authorMap))
+	for _, stats := range authorMap {
+		result = append(result, *stats)
+	}
+
+	// Sort by total commits (descending)
+	for i := 0; i < len(result); i++ {
+		for j := i + 1; j < len(result); j++ {
+			if result[j].TotalCommits > result[i].TotalCommits {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+
+	return result
+}
+
+// generateCodeReviewsSection generates the code reviews section
+func generateCodeReviewsSection(data *types.ReportData) string {
+	var sb strings.Builder
+
+	sb.WriteString("## 👀 Code Reviews\n\n")
+
+	// Collect PRs with reviews
+	prsWithReviews := []types.PullRequest{}
+	for _, pr := range data.OpenPRs {
+		if pr.Reviews > 0 {
+			prsWithReviews = append(prsWithReviews, pr)
+		}
+	}
+	for _, pr := range data.UpdatedPRs {
+		// Check if not already counted in open PRs
+		isOpen := false
+		for _, openPR := range data.OpenPRs {
+			if openPR.Number == pr.Number {
+				isOpen = true
+				break
+			}
+		}
+		if !isOpen && pr.Reviews > 0 {
+			prsWithReviews = append(prsWithReviews, pr)
+		}
+	}
+
+	if len(prsWithReviews) == 0 {
+		sb.WriteString("No code reviews found during this period\n\n")
+		return sb.String()
+	}
+
+	sb.WriteString("### Pull Requests Reviewed\n\n")
+
+	totalReviews := 0
+	for _, pr := range prsWithReviews {
+		sb.WriteString(fmt.Sprintf("- [PR #%d: %s](%s) - %d reviews\n",
+			pr.Number, pr.Title, pr.URL, pr.Reviews))
+		totalReviews += pr.Reviews
+	}
+
+	sb.WriteString(fmt.Sprintf("\n**Total Reviews**: %d\n\n", totalReviews))
+
+	return sb.String()
+}
+
+// generateAuthorSection generates a detailed section for a single author
+func generateAuthorSection(stats types.AuthorStats) string {
+	var sb strings.Builder
+
+	// Author header
+	sb.WriteString(fmt.Sprintf("### [%s](%s)\n\n", stats.Author.Login, stats.Author.ProfileURL))
+
+	// Overall statistics
+	sb.WriteString("#### Overall Statistics\n\n")
+	sb.WriteString(fmt.Sprintf("- **Total Commits**: %d\n", stats.TotalCommits))
+	sb.WriteString(fmt.Sprintf("- **Total Lines Added**: +%d\n", stats.TotalAdded))
+	sb.WriteString(fmt.Sprintf("- **Total Lines Deleted**: -%d\n", stats.TotalDeleted))
+	sb.WriteString(fmt.Sprintf("- **Pull Requests Created**: %d\n", stats.PRsCreated))
+	sb.WriteString(fmt.Sprintf("- **Issues Created**: %d\n", stats.IssuesCreated))
+	sb.WriteString(fmt.Sprintf("- **Code Reviews**: %d\n\n", stats.ReviewsCount))
+
+	// Activity by branch
+	if len(stats.BranchActivity) > 0 {
+		sb.WriteString("#### Activity by Branch\n\n")
+
+		for branchName, activity := range stats.BranchActivity {
+			sb.WriteString(fmt.Sprintf("##### Branch: %s\n\n", branchName))
+			sb.WriteString(fmt.Sprintf("- **Commits**: %d\n", activity.Commits))
+			sb.WriteString(fmt.Sprintf("- **Lines Added**: +%d\n", activity.Added))
+			sb.WriteString(fmt.Sprintf("- **Lines Deleted**: -%d\n\n", activity.Deleted))
+		}
+	}
+
+	sb.WriteString("---\n\n")
+
+	return sb.String()
+}
+
+// generateAuthorStatsSection generates the author activity section
+func generateAuthorStatsSection(authorStats []types.AuthorStats) string {
+	var sb strings.Builder
+
+	sb.WriteString("## 👥 Author Activity\n\n")
+
+	if len(authorStats) == 0 {
+		sb.WriteString("No author activity found during this period\n\n")
+		return sb.String()
+	}
+
+	for _, stats := range authorStats {
+		sb.WriteString(generateAuthorSection(stats))
+	}
+
+	return sb.String()
+}
