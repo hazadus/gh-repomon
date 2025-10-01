@@ -19,9 +19,9 @@ type commitResponse struct {
 		Message string `json:"message"`
 	} `json:"commit"`
 	Author struct {
-		Login      string `json:"login"`
-		HTMLURL    string `json:"html_url"`
-		Type       string `json:"type"`
+		Login   string `json:"login"`
+		HTMLURL string `json:"html_url"`
+		Type    string `json:"type"`
 	} `json:"author"`
 	HTMLURL string `json:"html_url"`
 	Stats   struct {

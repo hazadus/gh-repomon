@@ -1,6 +1,9 @@
 package report
 
 import (
+	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/hazadus/gh-repomon/internal/github"
@@ -60,8 +63,17 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Fprintf(os.Stderr, "  🔍 Found %d active branches\n", len(branches))
+
+	// Count total commits
+	totalCommits := 0
+	for _, branch := range branches {
+		totalCommits += len(branch.Commits)
+	}
+	fmt.Fprintf(os.Stderr, "  🔍 Collecting commits... Found %d commits\n", totalCommits)
 
 	// Get open pull requests
+	fmt.Fprintf(os.Stderr, "  🔍 Collecting pull requests...\n")
 	openPRs, err := g.githubClient.GetOpenPullRequests(opts.Repository)
 	if err != nil {
 		return nil, err
@@ -72,8 +84,10 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Fprintf(os.Stderr, "  🔍 Found %d open PRs, %d updated PRs\n", len(openPRs), len(updatedPRs))
 
 	// Get open issues
+	fmt.Fprintf(os.Stderr, "  🔍 Collecting issues...\n")
 	openIssues, err := g.githubClient.GetOpenIssues(opts.Repository)
 	if err != nil {
 		return nil, err
@@ -84,6 +98,7 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Fprintf(os.Stderr, "  🔍 Found %d open issues, %d closed issues\n", len(openIssues), len(closedIssues))
 
 	// Create report data
 	data := &types.ReportData{
@@ -103,6 +118,23 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 
 // generateMarkdown generates a markdown report from collected data
 func (g *Generator) generateMarkdown(data *types.ReportData) string {
-	// Placeholder for now - will be implemented in next steps
-	return "# Report\n\nData collected successfully\n"
+	var sb strings.Builder
+
+	// Calculate overall statistics
+	data.OverallStats = calculateOverallStats(data)
+
+	// Generate header
+	sb.WriteString(generateHeader(data))
+
+	// Generate summary statistics
+	sb.WriteString(generateSummaryStats(data.OverallStats))
+
+	// Placeholder for remaining sections
+	sb.WriteString("## 📊 Overall Summary\n\n")
+	sb.WriteString("[AI-generated overall summary will be here]\n\n")
+
+	sb.WriteString("---\n\n")
+	sb.WriteString("*More sections will be added in the next steps*\n")
+
+	return sb.String()
 }

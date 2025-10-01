@@ -105,11 +105,16 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create report generator
 	generator := report.NewGenerator(ghClient)
 
+	// Output progress
+	fmt.Fprintf(os.Stderr, "  🔍 Collecting branches...\n")
+
 	// Generate report
 	reportText, err := generator.Generate(opts)
 	if err != nil {
 		return fmt.Errorf("failed to generate report: %w", err)
 	}
+
+	fmt.Fprintf(os.Stderr, "  ✅ Report generated successfully!\n")
 
 	// Output report to stdout
 	fmt.Println(reportText)
