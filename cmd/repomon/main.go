@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hazadus/gh-repomon/internal/github"
+	"github.com/hazadus/gh-repomon/internal/llm"
 	"github.com/hazadus/gh-repomon/internal/report"
 	"github.com/hazadus/gh-repomon/internal/types"
 	"github.com/spf13/cobra"
@@ -85,6 +86,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Output progress to stderr
 	fmt.Fprintf(os.Stderr, "Connected to GitHub API\n")
+
+	// Create LLM client
+	llmClient, err := llm.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to create LLM client: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "Connected to LLM API\n")
+
 	fmt.Fprintf(os.Stderr, "Analyzing repository %s (%s to %s)\n",
 		repo,
 		from.Format("2006-01-02"),
@@ -103,7 +112,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create report generator
-	generator := report.NewGenerator(ghClient)
+	generator := report.NewGenerator(ghClient, llmClient)
 
 	// Output progress
 	fmt.Fprintf(os.Stderr, "  🔍 Collecting branches...\n")

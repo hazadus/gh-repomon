@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/hazadus/gh-repomon/internal/github"
+	"github.com/hazadus/gh-repomon/internal/llm"
 	"github.com/hazadus/gh-repomon/internal/types"
 )
 
 // Generator generates reports based on GitHub activity data
 type Generator struct {
 	githubClient *github.Client
-	llmClient    interface{} // Will be implemented later
+	llmClient    *llm.Client
 }
 
 // Options contains configuration for report generation
@@ -31,10 +32,10 @@ type Options struct {
 }
 
 // NewGenerator creates a new report generator
-func NewGenerator(ghClient *github.Client) *Generator {
+func NewGenerator(ghClient *github.Client, llmClient *llm.Client) *Generator {
 	return &Generator{
 		githubClient: ghClient,
-		llmClient:    nil, // Will be set later
+		llmClient:    llmClient,
 	}
 }
 
