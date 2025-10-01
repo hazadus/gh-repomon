@@ -51,3 +51,7 @@ build-all:
 # Generate commit message (see https://github.com/hazadus/gh-commitmsg)
 commitmsg:
     gh commitmsg --language english --examples
+
+# Generate code line count report
+cloc:
+    cloc --fullpath --exclude-list-file=.clocignore --md . > cloc.md
