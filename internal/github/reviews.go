@@ -1,7 +1,6 @@
 package github
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -103,14 +102,4 @@ func (c *Client) GetReviewsForPR(repo string, pr *types.PullRequest) error {
 
 	pr.Reviews = reviewCount
 	return nil
-}
-
-// ParseReviews is a helper to parse review JSON data
-func parseReviews(data []byte) ([]Review, error) {
-	var reviews []Review
-	err := json.Unmarshal(data, &reviews)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse reviews: %w", err)
-	}
-	return reviews, nil
 }

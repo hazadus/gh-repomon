@@ -37,7 +37,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	// Required flags
 	rootCmd.Flags().StringVarP(&repo, "repo", "r", "", "Repository name (owner/repo) (required)")
-	rootCmd.MarkFlagRequired("repo")
+	_ = rootCmd.MarkFlagRequired("repo")
 
 	// Optional flags
 	rootCmd.Flags().IntVarP(&days, "days", "d", 1, "Number of days back from today")

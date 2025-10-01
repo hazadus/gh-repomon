@@ -2,8 +2,6 @@ package github
 
 import (
 	"testing"
-
-	"github.com/hazadus/gh-repomon/internal/types"
 )
 
 func TestIsBot(t *testing.T) {
@@ -62,7 +60,6 @@ func TestIsBot(t *testing.T) {
 	// Create a client for testing
 	client := &Client{
 		excludeBots: false,
-		userCache:   make(map[string]*types.Author),
 	}
 
 	for _, tt := range tests {
