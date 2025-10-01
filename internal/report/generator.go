@@ -138,9 +138,17 @@ func (g *Generator) generateMarkdown(data *types.ReportData) string {
 		sb.WriteString(generateBranchesSection(data.Branches))
 	}
 
+	// Generate pull requests sections
+	sb.WriteString(generateOpenPRsSection(data.OpenPRs))
+	sb.WriteString(generateUpdatedPRsSection(data.UpdatedPRs))
+
+	// Generate issues sections
+	sb.WriteString(generateOpenIssuesSection(data.OpenIssues))
+	sb.WriteString(generateClosedIssuesSection(data.ClosedIssues))
+
 	// Placeholder for remaining sections
 	sb.WriteString("---\n\n")
-	sb.WriteString("*More sections (PRs, Issues, Reviews, Author Stats) will be added in the next steps*\n")
+	sb.WriteString("*More sections (Code Reviews, Author Stats) will be added in the next steps*\n")
 
 	return sb.String()
 }

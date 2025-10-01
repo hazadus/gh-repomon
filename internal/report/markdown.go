@@ -174,3 +174,128 @@ func generateBranchesSection(branches []types.Branch) string {
 
 	return sb.String()
 }
+
+// generatePRSection generates a section for a single pull request
+func generatePRSection(pr types.PullRequest) string {
+	var sb strings.Builder
+
+	// PR header with link
+	sb.WriteString(fmt.Sprintf("### [PR #%d: %s](%s)\n\n", pr.Number, pr.Title, pr.URL))
+
+	// Metadata
+	sb.WriteString(fmt.Sprintf("- **Author**: [%s](%s)\n", pr.Author.Login, pr.Author.ProfileURL))
+	sb.WriteString(fmt.Sprintf("- **Created**: %s\n", pr.CreatedAt.Format("2006-01-02")))
+	sb.WriteString(fmt.Sprintf("- **Status**: %s\n", pr.State))
+	sb.WriteString(fmt.Sprintf("- **Comments**: %d\n", pr.Comments))
+	sb.WriteString(fmt.Sprintf("- **Reviews**: %d\n\n", pr.Reviews))
+
+	// AI Summary placeholder
+	sb.WriteString("#### AI Summary\n\n")
+	sb.WriteString("[Brief AI summary will be here]\n\n")
+
+	sb.WriteString("---\n\n")
+
+	return sb.String()
+}
+
+// generateOpenPRsSection generates the section for open pull requests
+func generateOpenPRsSection(prs []types.PullRequest) string {
+	var sb strings.Builder
+
+	sb.WriteString("## 🔀 Open Pull Requests\n\n")
+
+	if len(prs) == 0 {
+		sb.WriteString("No open pull requests\n\n")
+		return sb.String()
+	}
+
+	for _, pr := range prs {
+		sb.WriteString(generatePRSection(pr))
+	}
+
+	return sb.String()
+}
+
+// generateUpdatedPRsSection generates the section for updated pull requests
+func generateUpdatedPRsSection(prs []types.PullRequest) string {
+	var sb strings.Builder
+
+	sb.WriteString("## 🔄 Updated Pull Requests\n\n")
+
+	if len(prs) == 0 {
+		sb.WriteString("No pull requests were updated during this period\n\n")
+		return sb.String()
+	}
+
+	for _, pr := range prs {
+		sb.WriteString(generatePRSection(pr))
+	}
+
+	return sb.String()
+}
+
+// generateIssueSection generates a section for a single issue
+func generateIssueSection(issue types.Issue) string {
+	var sb strings.Builder
+
+	// Issue header with link
+	sb.WriteString(fmt.Sprintf("### [Issue #%d: %s](%s)\n\n", issue.Number, issue.Title, issue.URL))
+
+	// Metadata
+	sb.WriteString(fmt.Sprintf("- **Author**: [%s](%s)\n", issue.Author.Login, issue.Author.ProfileURL))
+	sb.WriteString(fmt.Sprintf("- **Created**: %s\n", issue.CreatedAt.Format("2006-01-02")))
+
+	// Labels (if any)
+	if len(issue.Labels) > 0 {
+		sb.WriteString(fmt.Sprintf("- **Labels**: %s\n", strings.Join(issue.Labels, ", ")))
+	}
+
+	// Assignees (if any)
+	if len(issue.Assignees) > 0 {
+		assigneeLogins := make([]string, len(issue.Assignees))
+		for i, assignee := range issue.Assignees {
+			assigneeLogins[i] = assignee.Login
+		}
+		sb.WriteString(fmt.Sprintf("- **Assignees**: %s\n", formatAuthorLinks(assigneeLogins)))
+	}
+
+	sb.WriteString("\n---\n\n")
+
+	return sb.String()
+}
+
+// generateOpenIssuesSection generates the section for open issues
+func generateOpenIssuesSection(issues []types.Issue) string {
+	var sb strings.Builder
+
+	sb.WriteString("## 📋 Open Issues\n\n")
+
+	if len(issues) == 0 {
+		sb.WriteString("No open issues\n\n")
+		return sb.String()
+	}
+
+	for _, issue := range issues {
+		sb.WriteString(generateIssueSection(issue))
+	}
+
+	return sb.String()
+}
+
+// generateClosedIssuesSection generates the section for closed issues
+func generateClosedIssuesSection(issues []types.Issue) string {
+	var sb strings.Builder
+
+	sb.WriteString("## ✅ Closed Issues\n\n")
+
+	if len(issues) == 0 {
+		sb.WriteString("No issues were closed during this period\n\n")
+		return sb.String()
+	}
+
+	for _, issue := range issues {
+		sb.WriteString(generateIssueSection(issue))
+	}
+
+	return sb.String()
+}
