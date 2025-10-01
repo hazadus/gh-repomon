@@ -94,32 +94,23 @@ func run(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stderr, "Language: %s\n", language)
 	fmt.Fprintf(os.Stderr, "\n")
 
-	// Get commits for main branch
-	fmt.Fprintf(os.Stderr, "Fetching commits from main branch...\n")
-	commits, err := ghClient.GetCommits(repo, "main", from, to)
+	// Get active branches
+	fmt.Fprintf(os.Stderr, "Fetching active branches...\n")
+	branches, err := ghClient.GetActiveBranches(repo, from, to)
 	if err != nil {
-		return fmt.Errorf("failed to get commits: %w", err)
+		return fmt.Errorf("failed to get active branches: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "Found %d commits\n", len(commits))
+	fmt.Fprintf(os.Stderr, "Found %d active branches\n\n", len(branches))
 
-	// Display first 3 commits with statistics
-	displayCount := 3
-	if len(commits) < displayCount {
-		displayCount = len(commits)
-	}
-
-	if displayCount > 0 {
-		fmt.Fprintf(os.Stderr, "\nFirst %d commits:\n", displayCount)
-		for i := 0; i < displayCount; i++ {
-			commit := commits[i]
-			fmt.Fprintf(os.Stderr, "  %s - %s\n", commit.SHA[:7], commit.Message)
-			fmt.Fprintf(os.Stderr, "    Author: %s (%s)\n", commit.Author.Name, commit.Author.Login)
-			fmt.Fprintf(os.Stderr, "    Date: %s\n", commit.Date.Format("2006-01-02 15:04:05"))
-			fmt.Fprintf(os.Stderr, "    Stats: +%d/-%d lines\n", commit.Additions, commit.Deletions)
-			fmt.Fprintf(os.Stderr, "    URL: %s\n", commit.URL)
-			fmt.Fprintf(os.Stderr, "\n")
-		}
+	// Display information for each branch
+	for _, branch := range branches {
+		fmt.Fprintf(os.Stderr, "Branch: %s\n", branch.Name)
+		fmt.Fprintf(os.Stderr, "  Commits: %d\n", len(branch.Commits))
+		fmt.Fprintf(os.Stderr, "  Total Added: +%d lines\n", branch.TotalAdded)
+		fmt.Fprintf(os.Stderr, "  Total Deleted: -%d lines\n", branch.TotalDeleted)
+		fmt.Fprintf(os.Stderr, "  Authors: %v\n", branch.Authors)
+		fmt.Fprintf(os.Stderr, "\n")
 	}
 
 	return nil
