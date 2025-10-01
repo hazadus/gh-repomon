@@ -140,7 +140,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Inspired by [gh-standup](https://github.com/djaiss/gh-standup)
+- Inspired by [gh-standup](https://github.com/sgoedecke/gh-standup)
 - Built with [GitHub CLI Go library](https://github.com/cli/go-gh)
 - Powered by [GitHub Models](https://github.com/marketplace/models)
 
