@@ -113,6 +113,54 @@ func run(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "\n")
 	}
 
+	// Get open pull requests
+	fmt.Fprintf(os.Stderr, "Fetching open pull requests...\n")
+	openPRs, err := ghClient.GetOpenPullRequests(repo)
+	if err != nil {
+		return fmt.Errorf("failed to get open pull requests: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Found %d open pull requests\n", len(openPRs))
+
+	// Get updated pull requests
+	fmt.Fprintf(os.Stderr, "Fetching updated pull requests...\n")
+	fromISO := from.Format(time.RFC3339)
+	toISO := to.Format(time.RFC3339)
+	updatedPRs, err := ghClient.GetUpdatedPullRequests(repo, fromISO, toISO)
+	if err != nil {
+		return fmt.Errorf("failed to get updated pull requests: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Found %d updated pull requests\n\n", len(updatedPRs))
+
+	// Display first 3 open PRs for verification
+	fmt.Fprintf(os.Stderr, "Sample Open PRs:\n")
+	for i, pr := range openPRs {
+		if i >= 3 {
+			break
+		}
+		fmt.Fprintf(os.Stderr, "  PR #%d: %s\n", pr.Number, pr.Title)
+		fmt.Fprintf(os.Stderr, "    Author: %s\n", pr.Author.Login)
+		fmt.Fprintf(os.Stderr, "    State: %s\n", pr.State)
+		fmt.Fprintf(os.Stderr, "    Created: %s\n", pr.CreatedAt.Format("2006-01-02"))
+		fmt.Fprintf(os.Stderr, "    Comments: %d\n", pr.Comments)
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
+	// Display first 3 updated PRs for verification
+	if len(updatedPRs) > 0 {
+		fmt.Fprintf(os.Stderr, "Sample Updated PRs:\n")
+		for i, pr := range updatedPRs {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(os.Stderr, "  PR #%d: %s\n", pr.Number, pr.Title)
+			fmt.Fprintf(os.Stderr, "    Author: %s\n", pr.Author.Login)
+			fmt.Fprintf(os.Stderr, "    Updated: %s\n", pr.UpdatedAt.Format("2006-01-02"))
+			fmt.Fprintf(os.Stderr, "\n")
+		}
+	}
+
 	return nil
 }
 
