@@ -124,9 +124,12 @@ func generateBranchSection(branch types.Branch) string {
 	// Branch header
 	sb.WriteString(fmt.Sprintf("## 🌿 Branch: %s\n\n", branch.Name))
 
-	// AI Summary placeholder
-	sb.WriteString("### AI Summary\n\n")
-	sb.WriteString("[AI summary will be generated here]\n\n")
+	// AI Summary
+	if branch.AISummary != "" {
+		sb.WriteString("### AI Summary\n\n")
+		sb.WriteString(branch.AISummary)
+		sb.WriteString("\n\n")
+	}
 
 	// Statistics subsection
 	sb.WriteString("### Statistics\n\n")

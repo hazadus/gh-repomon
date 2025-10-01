@@ -59,6 +59,20 @@ func (g *Generator) Generate(opts Options) (string, error) {
 			overallSummary = summary
 			fmt.Fprintf(os.Stderr, "  ✅ Overall summary generated\n")
 		}
+
+		// Generate branch summaries
+		successCount := 0
+		for i := range data.Branches {
+			branchSummary, err := g.llmClient.GenerateBranchSummary(&data.Branches[i], opts.Language, opts.Model)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate summary for branch %s: %v\n", data.Branches[i].Name, err)
+				data.Branches[i].AISummary = fmt.Sprintf("Development activity in branch %s", data.Branches[i].Name)
+			} else {
+				data.Branches[i].AISummary = branchSummary
+				successCount++
+			}
+		}
+		fmt.Fprintf(os.Stderr, "  ✅ Branch summaries generated (%d/%d)\n", successCount, len(data.Branches))
 	} else {
 		overallSummary = "[AI summary generation disabled]"
 	}

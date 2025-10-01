@@ -14,4 +14,6 @@ type Branch struct {
 	TotalDeleted int
 	// Authors is the list of unique author logins who contributed to this branch
 	Authors []string
+	// AISummary is the AI-generated summary of branch activity
+	AISummary string
 }

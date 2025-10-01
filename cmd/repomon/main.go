@@ -41,7 +41,7 @@ func init() {
 	rootCmd.Flags().StringVar(&toDate, "to", "", "End date of the period (YYYY-MM-DD)")
 	rootCmd.Flags().StringVarP(&user, "user", "u", "", "Filter by user")
 	rootCmd.Flags().BoolVar(&excludeBots, "exclude-bots", false, "Exclude bot accounts")
-	rootCmd.Flags().StringVarP(&model, "model", "m", "openai/gpt-4o", "AI model to use")
+	rootCmd.Flags().StringVarP(&model, "model", "m", "gpt-4o", "AI model to use")
 	rootCmd.Flags().StringVarP(&language, "language", "l", "english", "Output language")
 }
 

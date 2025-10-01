@@ -133,3 +133,81 @@ func formatIssuesForPrompt(openIssues, closedIssues []types.Issue) string {
 
 	return strings.Join(parts, "\n")
 }
+
+// GenerateBranchSummary generates an AI summary for a single branch
+func (c *Client) GenerateBranchSummary(branch *types.Branch, language, model string) (string, error) {
+	// Load prompt
+	config, err := LoadPrompt("branch_summary")
+	if err != nil {
+		return fmt.Sprintf("Development activity in branch %s", branch.Name), fmt.Errorf("failed to load prompt: %w", err)
+	}
+
+	// Prepare variables
+	vars := map[string]string{
+		"language":        language,
+		"branch_name":     branch.Name,
+		"commit_count":    fmt.Sprintf("%d", len(branch.Commits)),
+		"authors":         strings.Join(branch.Authors, ", "),
+		"commit_messages": formatCommitMessagesForPrompt(branch.Commits),
+	}
+
+	// Render prompt
+	rendered, err := RenderPrompt(config, vars)
+	if err != nil {
+		return fmt.Sprintf("Development activity in branch %s", branch.Name), fmt.Errorf("failed to render prompt: %w", err)
+	}
+
+	// Convert prompt messages to chat messages
+	messages := make([]Message, len(rendered.Messages))
+	for i, msg := range rendered.Messages {
+		messages[i] = Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
+
+	// Create request
+	request := ChatCompletionRequest{
+		Model:       model,
+		Messages:    messages,
+		Temperature: rendered.ModelParameters.Temperature,
+	}
+
+	// Send request
+	response, err := c.Complete(request)
+	if err != nil {
+		return fmt.Sprintf("Development activity in branch %s", branch.Name), fmt.Errorf("failed to complete request: %w", err)
+	}
+
+	return response, nil
+}
+
+// formatCommitMessagesForPrompt formats commit messages for inclusion in prompt
+func formatCommitMessagesForPrompt(commits []types.Commit) string {
+	if len(commits) == 0 {
+		return "No commits"
+	}
+
+	var parts []string
+	maxCommits := 20
+
+	// Limit to first 20 commits
+	commitCount := len(commits)
+	if commitCount > maxCommits {
+		commitCount = maxCommits
+	}
+
+	for i := 0; i < commitCount; i++ {
+		commit := commits[i]
+		// Get first line of commit message
+		message := strings.Split(commit.Message, "\n")[0]
+		parts = append(parts, fmt.Sprintf("- %s (by %s)", message, commit.Author.Login))
+	}
+
+	// Add note if there are more commits
+	if len(commits) > maxCommits {
+		parts = append(parts, fmt.Sprintf("... and %d more commits", len(commits)-maxCommits))
+	}
+
+	return strings.Join(parts, "\n")
+}

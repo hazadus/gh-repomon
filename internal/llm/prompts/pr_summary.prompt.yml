@@ -1,6 +1,6 @@
 name: Pull Request Summary
 description: Generates a brief summary of a pull request
-model: openai/gpt-4o
+model: gpt-4o
 modelParameters:
   temperature: 0.7
   topP: 0.9
