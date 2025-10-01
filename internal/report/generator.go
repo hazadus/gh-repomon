@@ -47,8 +47,24 @@ func (g *Generator) Generate(opts Options) (string, error) {
 		return "", err
 	}
 
+	// Generate AI summary if LLM client is available
+	var overallSummary string
+	if g.llmClient != nil {
+		fmt.Fprintf(os.Stderr, "Generating AI summaries...\n")
+		summary, err := g.llmClient.GenerateOverallSummary(data, opts.Language, opts.Model)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate overall summary: %v\n", err)
+			overallSummary = "Summary generation failed. Please check the activity details below."
+		} else {
+			overallSummary = summary
+			fmt.Fprintf(os.Stderr, "  ✅ Overall summary generated\n")
+		}
+	} else {
+		overallSummary = "[AI summary generation disabled]"
+	}
+
 	// Generate markdown report
-	report := g.generateMarkdown(data)
+	report := g.generateMarkdown(data, overallSummary)
 
 	return report, nil
 }
@@ -118,7 +134,7 @@ func (g *Generator) collectData(opts Options) (*types.ReportData, error) {
 }
 
 // generateMarkdown generates a markdown report from collected data
-func (g *Generator) generateMarkdown(data *types.ReportData) string {
+func (g *Generator) generateMarkdown(data *types.ReportData, overallSummary string) string {
 	var sb strings.Builder
 
 	// Calculate overall statistics
@@ -133,9 +149,10 @@ func (g *Generator) generateMarkdown(data *types.ReportData) string {
 	// Generate summary statistics
 	sb.WriteString(generateSummaryStats(data.OverallStats))
 
-	// Placeholder for Overall AI Summary
+	// Overall AI Summary
 	sb.WriteString("## 📊 Overall Summary\n\n")
-	sb.WriteString("[AI-generated overall summary will be here]\n\n")
+	sb.WriteString(overallSummary)
+	sb.WriteString("\n\n")
 
 	// Generate branches section
 	if len(data.Branches) > 0 {
