@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/hazadus/gh-repomon/internal/github"
 	"github.com/spf13/cobra"
 )
 
@@ -74,7 +75,14 @@ func run(cmd *cobra.Command, args []string) error {
 		from = to.AddDate(0, 0, -days)
 	}
 
+	// Create GitHub client
+	ghClient, err := github.NewClient(excludeBots)
+	if err != nil {
+		return fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
 	// Output parameters to stderr for verification
+	fmt.Fprintf(os.Stderr, "Connected to GitHub API\n")
 	fmt.Fprintf(os.Stderr, "Repository: %s\n", repo)
 	fmt.Fprintf(os.Stderr, "Period: %s to %s\n", from.Format("2006-01-02"), to.Format("2006-01-02"))
 	fmt.Fprintf(os.Stderr, "Days: %d\n", days)
@@ -84,6 +92,9 @@ func run(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stderr, "Exclude bots: %v\n", excludeBots)
 	fmt.Fprintf(os.Stderr, "Model: %s\n", model)
 	fmt.Fprintf(os.Stderr, "Language: %s\n", language)
+
+	// Suppress unused variable warning for now
+	_ = ghClient
 
 	return nil
 }
