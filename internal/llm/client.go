@@ -100,7 +100,7 @@ func (c *Client) Complete(request ChatCompletionRequest) (string, error) {
 		}
 		return "", errors.NewLLMAPIError("failed to send request", 0, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)

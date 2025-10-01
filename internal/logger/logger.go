@@ -51,20 +51,20 @@ func (l *Logger) Error(message string) {
 
 // Progress logs a progress message with a search icon
 func (l *Logger) Progress(message string) {
-	fmt.Fprintf(l.output, "  🔍 %s\n", message)
+	_, _ = fmt.Fprintf(l.output, "  🔍 %s\n", message)
 }
 
 // Success logs a success message with a checkmark
 func (l *Logger) Success(message string) {
-	fmt.Fprintf(l.output, "  ✅ %s\n", message)
+	_, _ = fmt.Fprintf(l.output, "  ✅ %s\n", message)
 }
 
 // log is the internal logging function
 func (l *Logger) log(level, message, prefix string) {
 	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
 	if prefix != "" {
-		fmt.Fprintf(l.output, "[%s] %s%s %s\n", timestamp, prefix, level, message)
+		_, _ = fmt.Fprintf(l.output, "[%s] %s%s %s\n", timestamp, prefix, level, message)
 	} else {
-		fmt.Fprintf(l.output, "[%s] %s: %s\n", timestamp, level, message)
+		_, _ = fmt.Fprintf(l.output, "[%s] %s: %s\n", timestamp, level, message)
 	}
 }

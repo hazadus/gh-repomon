@@ -36,10 +36,7 @@ func (c *Client) GenerateOverallSummary(data *types.ReportData, language, model 
 	// Convert prompt messages to chat messages
 	messages := make([]Message, len(rendered.Messages))
 	for i, msg := range rendered.Messages {
-		messages[i] = Message{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
+		messages[i] = Message(msg)
 	}
 
 	// Create request
@@ -160,10 +157,7 @@ func (c *Client) GenerateBranchSummary(branch *types.Branch, language, model str
 	// Convert prompt messages to chat messages
 	messages := make([]Message, len(rendered.Messages))
 	for i, msg := range rendered.Messages {
-		messages[i] = Message{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
+		messages[i] = Message(msg)
 	}
 
 	// Create request
@@ -246,10 +240,7 @@ func (c *Client) GeneratePRSummary(pr *types.PullRequest, language, model string
 	// Convert prompt messages to chat messages
 	messages := make([]Message, len(rendered.Messages))
 	for i, msg := range rendered.Messages {
-		messages[i] = Message{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
+		messages[i] = Message(msg)
 	}
 
 	// Create request
