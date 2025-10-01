@@ -211,3 +211,59 @@ func formatCommitMessagesForPrompt(commits []types.Commit) string {
 
 	return strings.Join(parts, "\n")
 }
+
+// GeneratePRSummary generates an AI summary for a single pull request
+func (c *Client) GeneratePRSummary(pr *types.PullRequest, language, model string) (string, error) {
+	// Load prompt
+	config, err := LoadPrompt("pr_summary")
+	if err != nil {
+		return fmt.Sprintf("Pull request: %s", pr.Title), fmt.Errorf("failed to load prompt: %w", err)
+	}
+
+	// Prepare PR description (limit to 500 characters if too long)
+	description := pr.Body
+	if len(description) > 500 {
+		description = description[:497] + "..."
+	}
+	if description == "" {
+		description = "(no description provided)"
+	}
+
+	// Prepare variables
+	vars := map[string]string{
+		"language":        language,
+		"pr_title":        pr.Title,
+		"pr_description":  description,
+		"commit_messages": "(commit messages not available for PR summary)",
+	}
+
+	// Render prompt
+	rendered, err := RenderPrompt(config, vars)
+	if err != nil {
+		return fmt.Sprintf("Pull request: %s", pr.Title), fmt.Errorf("failed to render prompt: %w", err)
+	}
+
+	// Convert prompt messages to chat messages
+	messages := make([]Message, len(rendered.Messages))
+	for i, msg := range rendered.Messages {
+		messages[i] = Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
+
+	// Create request
+	request := ChatCompletionRequest{
+		Model:       model,
+		Messages:    messages,
+		Temperature: rendered.ModelParameters.Temperature,
+	}
+
+	// Send request
+	response, err := c.Complete(request)
+	if err != nil {
+		return fmt.Sprintf("Pull request: %s", pr.Title), fmt.Errorf("failed to complete request: %w", err)
+	}
+
+	return response, nil
+}

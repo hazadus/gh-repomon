@@ -24,4 +24,6 @@ type PullRequest struct {
 	Reviews int
 	// URL is the link to the PR on GitHub
 	URL string
+	// AISummary is the AI-generated summary of the PR
+	AISummary string
 }

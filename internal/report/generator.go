@@ -61,7 +61,7 @@ func (g *Generator) Generate(opts Options) (string, error) {
 		}
 
 		// Generate branch summaries
-		successCount := 0
+		branchSuccessCount := 0
 		for i := range data.Branches {
 			branchSummary, err := g.llmClient.GenerateBranchSummary(&data.Branches[i], opts.Language, opts.Model)
 			if err != nil {
@@ -69,10 +69,37 @@ func (g *Generator) Generate(opts Options) (string, error) {
 				data.Branches[i].AISummary = fmt.Sprintf("Development activity in branch %s", data.Branches[i].Name)
 			} else {
 				data.Branches[i].AISummary = branchSummary
-				successCount++
+				branchSuccessCount++
 			}
 		}
-		fmt.Fprintf(os.Stderr, "  ✅ Branch summaries generated (%d/%d)\n", successCount, len(data.Branches))
+		fmt.Fprintf(os.Stderr, "  ✅ Branch summaries generated (%d/%d)\n", branchSuccessCount, len(data.Branches))
+
+		// Generate PR summaries for open PRs
+		prSuccessCount := 0
+		totalPRs := len(data.OpenPRs) + len(data.UpdatedPRs)
+		for i := range data.OpenPRs {
+			prSummary, err := g.llmClient.GeneratePRSummary(&data.OpenPRs[i], opts.Language, opts.Model)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate summary for PR #%d: %v\n", data.OpenPRs[i].Number, err)
+				data.OpenPRs[i].AISummary = fmt.Sprintf("Pull request: %s", data.OpenPRs[i].Title)
+			} else {
+				data.OpenPRs[i].AISummary = prSummary
+				prSuccessCount++
+			}
+		}
+
+		// Generate PR summaries for updated PRs
+		for i := range data.UpdatedPRs {
+			prSummary, err := g.llmClient.GeneratePRSummary(&data.UpdatedPRs[i], opts.Language, opts.Model)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "  ⚠️  Warning: Failed to generate summary for PR #%d: %v\n", data.UpdatedPRs[i].Number, err)
+				data.UpdatedPRs[i].AISummary = fmt.Sprintf("Pull request: %s", data.UpdatedPRs[i].Title)
+			} else {
+				data.UpdatedPRs[i].AISummary = prSummary
+				prSuccessCount++
+			}
+		}
+		fmt.Fprintf(os.Stderr, "  ✅ PR summaries generated (%d/%d)\n", prSuccessCount, totalPRs)
 	} else {
 		overallSummary = "[AI summary generation disabled]"
 	}

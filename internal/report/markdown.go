@@ -192,9 +192,12 @@ func generatePRSection(pr types.PullRequest) string {
 	sb.WriteString(fmt.Sprintf("- **Comments**: %d\n", pr.Comments))
 	sb.WriteString(fmt.Sprintf("- **Reviews**: %d\n\n", pr.Reviews))
 
-	// AI Summary placeholder
-	sb.WriteString("#### AI Summary\n\n")
-	sb.WriteString("[Brief AI summary will be here]\n\n")
+	// AI Summary
+	if pr.AISummary != "" {
+		sb.WriteString("#### AI Summary\n\n")
+		sb.WriteString(pr.AISummary)
+		sb.WriteString("\n\n")
+	}
 
 	sb.WriteString("---\n\n")
 
