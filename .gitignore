@@ -1,0 +1,16 @@
+# Binaries
+/bin/
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# Build artifacts
+dist/
+release/
