@@ -116,3 +116,61 @@ func formatCommitMessage(message string) (short, full string) {
 	full = message
 	return
 }
+
+// generateBranchSection generates a detailed section for a single branch
+func generateBranchSection(branch types.Branch) string {
+	var sb strings.Builder
+
+	// Branch header
+	sb.WriteString(fmt.Sprintf("## 🌿 Branch: %s\n\n", branch.Name))
+
+	// AI Summary placeholder
+	sb.WriteString("### AI Summary\n\n")
+	sb.WriteString("[AI summary will be generated here]\n\n")
+
+	// Statistics subsection
+	sb.WriteString("### Statistics\n\n")
+	sb.WriteString(fmt.Sprintf("- **Total Commits**: %d\n", len(branch.Commits)))
+	sb.WriteString(fmt.Sprintf("- **Lines Added**: +%d\n", branch.TotalAdded))
+	sb.WriteString(fmt.Sprintf("- **Lines Deleted**: -%d\n", branch.TotalDeleted))
+	sb.WriteString(fmt.Sprintf("- **Contributors**: %s\n\n", formatAuthorLinks(branch.Authors)))
+
+	// Commits subsection
+	sb.WriteString("### Commits\n\n")
+
+	for _, commit := range branch.Commits {
+		short, full := formatCommitMessage(commit.Message)
+
+		sb.WriteString(fmt.Sprintf("#### [%s](%s)\n\n", short, commit.URL))
+		sb.WriteString(fmt.Sprintf("**Author**: [%s](%s) | **Date**: %s\n\n",
+			commit.Author.Login,
+			commit.Author.ProfileURL,
+			formatDate(commit.Date)))
+		sb.WriteString(fmt.Sprintf("**Changes**: +%d / -%d lines\n\n",
+			commit.Additions,
+			commit.Deletions))
+
+		// Add full message if it's multiline
+		if strings.Contains(full, "\n") && full != short {
+			// Escape any special markdown characters in the full message
+			sb.WriteString("```\n")
+			sb.WriteString(full)
+			sb.WriteString("\n```\n\n")
+		}
+
+		sb.WriteString("---\n\n")
+	}
+
+	return sb.String()
+}
+
+// generateBranchesSection generates sections for all branches
+func generateBranchesSection(branches []types.Branch) string {
+	var sb strings.Builder
+
+	for _, branch := range branches {
+		sb.WriteString(generateBranchSection(branch))
+	}
+
+	return sb.String()
+}

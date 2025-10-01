@@ -129,12 +129,18 @@ func (g *Generator) generateMarkdown(data *types.ReportData) string {
 	// Generate summary statistics
 	sb.WriteString(generateSummaryStats(data.OverallStats))
 
-	// Placeholder for remaining sections
+	// Placeholder for Overall AI Summary
 	sb.WriteString("## 📊 Overall Summary\n\n")
 	sb.WriteString("[AI-generated overall summary will be here]\n\n")
 
+	// Generate branches section
+	if len(data.Branches) > 0 {
+		sb.WriteString(generateBranchesSection(data.Branches))
+	}
+
+	// Placeholder for remaining sections
 	sb.WriteString("---\n\n")
-	sb.WriteString("*More sections will be added in the next steps*\n")
+	sb.WriteString("*More sections (PRs, Issues, Reviews, Author Stats) will be added in the next steps*\n")
 
 	return sb.String()
 }
