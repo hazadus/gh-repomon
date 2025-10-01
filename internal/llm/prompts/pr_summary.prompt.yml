@@ -1,0 +1,28 @@
+name: Pull Request Summary
+description: Generates a brief summary of a pull request
+model: openai/gpt-4o
+modelParameters:
+  temperature: 0.7
+  topP: 0.9
+messages:
+  - role: system
+    content: >
+      You are an AI assistant analyzing software development activity.
+      Generate a brief summary (2-3 sentences) describing what this pull request
+      does based on its title, description, and commit messages.
+
+      Output language: {{language}}
+
+  - role: user
+    content: |
+      Analyze the pull request:
+
+      Title: {{pr_title}}
+
+      Description:
+      {{pr_description}}
+
+      Commit messages:
+      {{commit_messages}}
+
+      Generate a brief summary of what this pull request does.

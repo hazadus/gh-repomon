@@ -94,6 +94,13 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "Connected to LLM API\n")
 
+	// Test loading a prompt
+	promptConfig, err := llm.LoadPrompt("overall_summary")
+	if err != nil {
+		return fmt.Errorf("failed to load prompt: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "Loaded prompt: %s\n", promptConfig.Name)
+
 	fmt.Fprintf(os.Stderr, "Analyzing repository %s (%s to %s)\n",
 		repo,
 		from.Format("2006-01-02"),
