@@ -213,6 +213,58 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Get code review statistics
+	fmt.Fprintf(os.Stderr, "Fetching code review statistics...\n")
+
+	// Combine all PRs for review analysis
+	allPRs := append(openPRs[:0:0], openPRs...)
+	allPRs = append(allPRs, updatedPRs...)
+
+	// Get total review count
+	totalReviews, err := ghClient.GetAllReviews(repo, allPRs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to get reviews: %v\n", err)
+	} else {
+		fmt.Fprintf(os.Stderr, "Found %d total reviews\n", totalReviews)
+	}
+
+	// Get reviews grouped by author
+	reviewsByAuthor, err := ghClient.GetReviewsByAuthor(repo, allPRs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to get reviews by author: %v\n", err)
+	} else {
+		fmt.Fprintf(os.Stderr, "\nTop Reviewers:\n")
+
+		// Sort reviewers by count (simple bubble sort for top 3)
+		type reviewer struct {
+			login string
+			count int
+		}
+
+		reviewers := make([]reviewer, 0, len(reviewsByAuthor))
+		for login, count := range reviewsByAuthor {
+			reviewers = append(reviewers, reviewer{login: login, count: count})
+		}
+
+		// Simple sort by count (descending)
+		for i := 0; i < len(reviewers); i++ {
+			for j := i + 1; j < len(reviewers); j++ {
+				if reviewers[j].count > reviewers[i].count {
+					reviewers[i], reviewers[j] = reviewers[j], reviewers[i]
+				}
+			}
+		}
+
+		// Display top 3
+		for i, r := range reviewers {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(os.Stderr, "  %d. %s - %d reviews\n", i+1, r.login, r.count)
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
 	return nil
 }
 
