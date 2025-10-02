@@ -16,6 +16,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for multiple repositories
 - Comparison between different time periods
 
+## [1.1.0] - 2025-10-02
+
+### Added
+- Automatic retry with exponential backoff for LLM API requests
+- Rate limit detection (HTTP 429) with intelligent wait time extraction from error messages
+- Up to 3 automatic retries for server errors (5xx)
+- Enhanced logging with `Infof` and `Warningf` methods in logger
+
+### Changed
+- Improved LLM client error handling and reliability
+- Better API failure recovery with automatic retry logic
+
+### Documentation
+- Updated [architecture.md](docs/architecture.md) with retry pattern and intelligent backoff details
+- Revised [troubleshooting.md](docs/troubleshooting.md) with automatic retry behavior information
+
+### Tests
+- Added unit tests for wait time extraction from error messages
+- Added tests for daily rate limit and shorter wait time handling
+
 ## [1.0.1] - 2025-10-02
 
 ### Changed
@@ -85,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Prompt customization guide
 
-[Unreleased]: https://github.com/hazadus/gh-repomon/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/hazadus/gh-repomon/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/hazadus/gh-repomon/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/hazadus/gh-repomon/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/hazadus/gh-repomon/releases/tag/v1.0.0
