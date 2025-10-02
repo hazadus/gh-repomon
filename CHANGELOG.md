@@ -16,6 +16,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for multiple repositories
 - Comparison between different time periods
 
+## [1.0.1] - 2025-10-02
+
+### Changed
+- Embedded YAML prompt files directly into binary using Go's `//go:embed` directive
+- Binary is now fully self-contained and works without external prompt files
+- External prompt files now override embedded ones during development for easier testing
+
+### Added
+- Unit tests for embedded prompt loading and external file override mechanism
+- Documentation for prompt embedding approach in multiple docs files
+
+### Fixed
+- Improved nil pointer handling in LLM client initialization
+
+### Documentation
+- Updated [architecture.md](docs/architecture.md) with prompt embedding details
+- Updated [installation.md](docs/installation.md) to highlight self-contained binary
+- Updated [troubleshooting.md](docs/troubleshooting.md) with prompt embedding info
+- Updated [contributing.md](docs/contributing.md) with prompt testing instructions
+- Enhanced [prompts.md](docs/prompts.md) with embedded vs external prompts explanation
+
+### Chore
+- Updated `.clocignore` to exclude coverage files (`coverage.html`, `coverage.out`)
+
 ## [1.0.0] - 2025-10-01
 
 ### Added
@@ -61,5 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Prompt customization guide
 
-[Unreleased]: https://github.com/hazadus/gh-repomon/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/hazadus/gh-repomon/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/hazadus/gh-repomon/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/hazadus/gh-repomon/releases/tag/v1.0.0
