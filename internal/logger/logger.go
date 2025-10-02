@@ -68,3 +68,16 @@ func (l *Logger) log(level, message, prefix string) {
 		_, _ = fmt.Fprintf(l.output, "[%s] %s: %s\n", timestamp, level, message)
 	}
 }
+
+// Default logger instance for package-level logging
+var defaultLogger = New()
+
+// Infof logs an informational message with formatting
+func Infof(format string, args ...interface{}) {
+	defaultLogger.Info(fmt.Sprintf(format, args...))
+}
+
+// Warningf logs a warning message with formatting
+func Warningf(format string, args ...interface{}) {
+	defaultLogger.Warning(fmt.Sprintf(format, args...))
+}

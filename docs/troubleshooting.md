@@ -186,25 +186,44 @@ Error: API rate limit exceeded
 
 **Solution:**
 
-1. **Check rate limit status:**
+1. **GitHub Models API Rate Limit (Auto-Retry):**
+
+   As of version 1.1.0, gh-repomon **automatically handles** GitHub Models API rate limits:
+   - Detects rate limit errors (429 status)
+   - Extracts wait time from error message
+   - Waits the required time plus a small buffer
+   - Retries automatically (up to 3 attempts)
+   - Logs the wait time and retry progress
+
+   You'll see messages like:
+   ```
+   [2025-10-02 08:10:50] ⚠️ WARN Rate limit reached, waiting 31s before retry (attempt 1/3)
+   ```
+
+   **No action needed** - just wait for the automatic retry!
+
+2. **GitHub REST API Rate Limit:**
+
+   Check rate limit status:
    ```bash
    gh api rate_limit
    ```
 
-2. **Wait for reset:**
-   - Rate limits reset hourly
-   - Check `X-RateLimit-Reset` in the error message
+3. **Wait for reset:**
+   - GitHub REST API limits reset hourly
+   - GitHub Models API limits are shorter (typically 60 seconds)
+   - Check error message for reset time
 
-3. **Use authenticated requests:**
+4. **Use authenticated requests:**
    - Authenticated requests have higher limits (5000/hour vs 60/hour)
    - Verify you're authenticated: `gh auth status`
 
-4. **Reduce scope:**
+5. **Reduce scope:**
    ```bash
    # Shorter time period
    gh-repomon --repo owner/repo --days 1
 
-   # Disable AI
+   # Disable AI (avoids Models API entirely)
    gh-repomon --repo owner/repo --days 7 --no-ai
    ```
 

@@ -124,12 +124,21 @@ gh-repomon is a CLI tool built in Go that analyzes GitHub repository activity an
 - YAML-based prompt system
 - Template variable substitution
 - Graceful fallback on errors
-- Rate limiting
-- Timeout handling
+- **Automatic retry with exponential backoff**
+- **Intelligent rate limit handling**
+- Timeout handling (30s per request)
+
+**Retry Logic:**
+- Detects rate limit errors (HTTP 429)
+- Extracts wait time from error response
+- Automatically waits and retries (up to 3 attempts)
+- Exponential backoff for server errors (5xx)
+- Logs retry progress and success
 
 **Design Patterns:**
 - Template pattern for prompts
 - Strategy pattern for different summary types
+- Retry pattern with intelligent backoff
 
 ### 4. Report Generator (`internal/report/`)
 
@@ -463,10 +472,12 @@ Future consideration for plugin system:
 - Cache user data
 - Parallel requests within limits
 
-**GitHub Models:**
-- Rate limits vary by model
-- Implement backoff/retry
-- Use worker pools to limit concurrency
+**GitHub Models API:**
+- Rate limits vary by model (typically 10 requests per 60 seconds)
+- **Automatic retry with intelligent backoff** (implemented in v1.1.0)
+- Extracts wait time from error response
+- Retries up to 3 times with proper delays
+- Use worker pools to limit concurrency (max 5 concurrent requests)
 
 ### 2. Memory Usage
 
