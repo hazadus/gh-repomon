@@ -63,6 +63,8 @@ After installation, you can use it as:
 gh repomon --repo owner/repository --days 7
 ```
 
+**Note:** The binary is fully self-contained with all prompt files embedded, so it works immediately after installation without requiring any additional files or configuration.
+
 ### Method 3: From Source
 
 Clone and build manually:
@@ -95,6 +97,8 @@ curl -L https://github.com/hazadus/gh-repomon/releases/latest/download/gh-repomo
 chmod +x gh-repomon
 mv gh-repomon /usr/local/bin/
 ```
+
+**Note:** Pre-built binaries are fully self-contained with all prompt files embedded. No additional files or dependencies required.
 
 Available platforms:
 - `gh-repomon-linux-amd64` - Linux (Intel/AMD)

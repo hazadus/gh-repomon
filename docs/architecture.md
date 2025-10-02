@@ -272,8 +272,8 @@ gh-repomon/
 │   ├── llm/              # LLM client
 │   │   ├── client.go
 │   │   ├── generator.go
-│   │   ├── prompts.go
-│   │   └── prompts/      # YAML prompt templates
+│   │   ├── prompts.go    # Embeds prompts via //go:embed
+│   │   └── prompts/      # YAML prompt templates (embedded in binary)
 │   │       ├── overall_summary.prompt.yml
 │   │       ├── branch_summary.prompt.yml
 │   │       └── pr_summary.prompt.yml
@@ -342,11 +342,16 @@ gh-repomon/
 - Version controllable
 - Supports multi-line text naturally
 - Template variable support
+- Embedded in binary via `//go:embed` for self-contained distribution
+- External override support for development and customization
 
 **Alternatives Considered:**
 - Hardcoded prompts (too rigid)
 - JSON (less readable)
 - Separate .txt files (harder to manage metadata)
+
+**Implementation:**
+Prompts are embedded directly into the binary using Go's `//go:embed` directive. This makes the binary fully self-contained while still allowing developers to override prompts by placing external files in `internal/llm/prompts/` during development.
 
 ### 4. Why Markdown Output?
 

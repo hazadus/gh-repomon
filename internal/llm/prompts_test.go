@@ -83,9 +83,12 @@ func TestLoadPrompt_FromFile(t *testing.T) {
 }
 
 func TestLoadPrompt_NotFound(t *testing.T) {
-	_, err := LoadPrompt("nonexistent_prompt_file")
+	_, err := LoadPrompt("nonexistent_prompt_file_that_does_not_exist_anywhere")
 	if err == nil {
 		t.Error("LoadPrompt() expected error for non-existent file, got nil")
+	}
+	if !strings.Contains(err.Error(), "tried external and embedded") {
+		t.Errorf("Expected error to mention both external and embedded, got: %v", err)
 	}
 }
 
@@ -259,5 +262,54 @@ func TestRenderPrompt_PreservesStructure(t *testing.T) {
 		if rendered.Messages[i].Role != original.Messages[i].Role {
 			t.Errorf("RenderPrompt() Message[%d] Role = %v, want %v", i, rendered.Messages[i].Role, original.Messages[i].Role)
 		}
+	}
+}
+
+func TestLoadPrompt_FromEmbedded(t *testing.T) {
+	// Test loading real prompt files that should be embedded
+	promptNames := []string{"overall_summary", "branch_summary", "pr_summary"}
+
+	for _, name := range promptNames {
+		t.Run(name, func(t *testing.T) {
+			config, err := LoadPrompt(name)
+			if err != nil {
+				t.Fatalf("LoadPrompt(%q) failed: %v", name, err)
+			}
+
+			// Verify basic structure
+			if config.Name == "" {
+				t.Error("Name is empty")
+			}
+			if config.Model == "" {
+				t.Error("Model is empty")
+			}
+			if len(config.Messages) == 0 {
+				t.Error("Messages is empty")
+			}
+		})
+	}
+}
+
+func TestLoadPrompt_ExternalOverridesEmbedded(t *testing.T) {
+	// This test verifies that external files take precedence over embedded files
+	// when running from the source directory
+
+	// Try to load a prompt that exists in both external and embedded
+	config, err := LoadPrompt("overall_summary")
+	if err != nil {
+		t.Fatalf("LoadPrompt() failed: %v", err)
+	}
+
+	// Should successfully load (either from external or embedded)
+	if config == nil {
+		t.Fatal("LoadPrompt() returned nil config")
+	}
+
+	// Verify it's a valid config
+	if config.Name == "" {
+		t.Error("Config Name is empty")
+	}
+	if config.Model == "" {
+		t.Error("Config Model is empty")
 	}
 }

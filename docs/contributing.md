@@ -485,6 +485,26 @@ just build
 diff expected.md actual.md
 ```
 
+### Testing Prompt Changes
+
+When modifying AI prompts:
+
+```bash
+# Edit prompt file
+vim internal/llm/prompts/overall_summary.prompt.yml
+
+# Test without rebuilding (external file takes precedence)
+go run ./cmd/repomon --repo test/repo --days 1
+
+# When satisfied, rebuild to embed the changes
+just build
+
+# Test the binary works without source files
+cp bin/gh-repomon /tmp/
+cd /tmp/
+./gh-repomon --repo test/repo --days 1
+```
+
 ## Project Structure
 
 Understanding the codebase:
@@ -495,6 +515,8 @@ gh-repomon/
 ├── internal/             # Private code
 │   ├── github/           # GitHub API client
 │   ├── llm/              # AI/LLM client
+│   │   ├── prompts.go    # Embeds prompts via //go:embed
+│   │   └── prompts/      # YAML prompts (embedded in binary)
 │   ├── report/           # Report generation
 │   ├── types/            # Data types
 │   ├── logger/           # Logging
@@ -504,6 +526,8 @@ gh-repomon/
 ├── docs/                 # Documentation
 └── Justfile              # Task runner
 ```
+
+**Important:** Prompt files in `internal/llm/prompts/` are embedded into the binary using Go's `//go:embed` directive. External files in this directory take precedence during development, allowing you to test prompt changes without rebuilding.
 
 See [Architecture](architecture.md) for detailed design.
 

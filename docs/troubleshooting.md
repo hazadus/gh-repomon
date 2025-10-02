@@ -338,6 +338,22 @@ Process consumes too much memory.
 
 ## AI/LLM Issues
 
+### Prompt Files Not Found (Legacy Issue - Fixed)
+
+**Problem:**
+```
+Error: failed to load prompt: failed to read prompt file internal/llm/prompts/overall_summary.prompt.yml: no such file or directory
+```
+
+**Solution:**
+
+This issue has been fixed in recent versions. Prompt files are now embedded directly into the binary using Go's `//go:embed` directive, making the binary fully self-contained.
+
+**If you still see this error:**
+1. Update to the latest version: `gh extension upgrade repomon`
+2. Or rebuild from source: `just build`
+3. The error should not occur with version 1.1.0 or later
+
 ### AI Summaries Not Generated
 
 **Problem:**
@@ -400,8 +416,9 @@ AI summaries are in English when another language was requested.
    gh-repomon --repo owner/repo --days 7 --language russian
    ```
 
-2. **Check prompt configuration:**
-   - Verify `internal/llm/prompts/*.yml` files include `{{language}}` variable
+2. **Override prompt for testing:**
+   - Create `internal/llm/prompts/overall_summary.prompt.yml` with modified language instructions
+   - External prompts override embedded ones during development
 
 3. **Try different model:**
    ```bash
@@ -506,7 +523,10 @@ gh-repomon --repo owner/repo --days 7 --no-ai
 
 ### Q: Can I customize AI prompts?
 
-**A:** Yes! See [Prompts Guide](prompts.md) for details on customizing YAML prompts.
+**A:** Yes! Prompts are embedded in the binary but can be overridden:
+- **For development:** Place modified prompts in `internal/llm/prompts/` - they take precedence
+- **For production:** Rebuild the binary after modifying prompts to embed the changes
+See [Prompts Guide](prompts.md) for details.
 
 ### Q: How do I report a bug?
 
@@ -536,8 +556,9 @@ gh-repomon --repo owner/repo --days 7 --no-ai
 
 **A:** Yes:
 1. Use `--verbose` to see LLM interactions
-2. Check prompt files in `internal/llm/prompts/`
+2. Override prompts by placing modified files in `internal/llm/prompts/` (from source)
 3. See [Prompts Guide](prompts.md) for customization
+4. Prompts are embedded in the binary - external files take precedence during development
 
 ### Q: Why is the report different each time?
 

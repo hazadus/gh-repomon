@@ -2,4 +2,5 @@
 .vscode/
 bin/
 scratch/
-docs/
+coverage.html
+coverage.out

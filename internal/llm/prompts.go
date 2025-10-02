@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed prompts/*.prompt.yml
+var promptsFS embed.FS
 
 // ModelParameters represents LLM model parameters
 type ModelParameters struct {
@@ -30,21 +34,30 @@ type PromptConfig struct {
 	Messages        []PromptMessage `yaml:"messages"`
 }
 
-// LoadPrompt loads a YAML prompt configuration from file
+// LoadPrompt loads a YAML prompt configuration from file.
+// It first tries to load from an external file (for development/customization),
+// and if that fails, loads from the embedded filesystem (production).
 func LoadPrompt(name string) (*PromptConfig, error) {
-	// Build path to prompt file
-	path := filepath.Join("internal", "llm", "prompts", name+".prompt.yml")
+	var data []byte
+	var err error
 
-	// Read file
-	data, err := os.ReadFile(path)
+	// Try to load from external file first (for development and customization)
+	externalPath := filepath.Join("internal", "llm", "prompts", name+".prompt.yml")
+	data, err = os.ReadFile(externalPath)
+
+	// If external file not found, load from embedded filesystem
 	if err != nil {
-		return nil, fmt.Errorf("failed to read prompt file %s: %w", path, err)
+		embeddedPath := filepath.Join("prompts", name+".prompt.yml")
+		data, err = promptsFS.ReadFile(embeddedPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read prompt file %s (tried external and embedded): %w", name, err)
+		}
 	}
 
 	// Parse YAML
 	var config PromptConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML from %s: %w", path, err)
+		return nil, fmt.Errorf("failed to parse YAML from %s: %w", name, err)
 	}
 
 	return &config, nil

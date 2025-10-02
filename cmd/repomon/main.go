@@ -98,19 +98,23 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	log.Success("Connected to GitHub API")
 
+	// Create report generator
+	var generator *report.Generator
+
 	// Create LLM client (unless --no-ai is specified)
-	var llmClient *llm.Client
 	if noAI {
 		log.Info("AI summary generation disabled (--no-ai)")
-		llmClient = nil
+		// Pass nil directly to avoid interface nil pointer issue
+		generator = report.NewGeneratorWithClients(ghClient, nil)
 	} else {
 		log.Info("Connecting to LLM API...")
-		llmClient, err = llm.NewClient()
+		llmClient, err := llm.NewClient()
 		if err != nil {
 			log.Warning("Failed to create LLM client, AI summaries will be disabled")
-			llmClient = nil
+			generator = report.NewGeneratorWithClients(ghClient, nil)
 		} else {
 			log.Success("Connected to LLM API")
+			generator = report.NewGenerator(ghClient, llmClient)
 		}
 	}
 
@@ -130,9 +134,6 @@ func run(cmd *cobra.Command, args []string) error {
 		Model:    model,
 		Language: language,
 	}
-
-	// Create report generator
-	generator := report.NewGenerator(ghClient, llmClient)
 
 	// Generate report
 	log.Progress("Collecting repository data...")

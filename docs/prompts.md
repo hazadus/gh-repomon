@@ -24,6 +24,26 @@ gh-repomon uses YAML-based prompts to generate AI summaries. This approach offer
 
 All prompts are located in `internal/llm/prompts/` with the `.prompt.yml` extension.
 
+### Embedded vs External Prompts
+
+**Embedded Prompts (Production):**
+- All prompt files are embedded directly into the compiled binary using Go's `//go:embed` directive
+- The binary is fully self-contained and works anywhere without requiring external files
+- Perfect for CI/CD environments, `gh extension install`, and distribution
+- No need to copy or deploy prompt files separately
+
+**External Prompts (Development/Customization):**
+- You can override embedded prompts by placing files in `internal/llm/prompts/`
+- External files take precedence over embedded ones
+- Useful for development, testing, and customization
+- Changes take effect immediately without recompilation
+
+**Load Priority:**
+1. First: External file in `internal/llm/prompts/` (if exists)
+2. Fallback: Embedded file in the binary
+
+This design ensures the tool works out-of-the-box while allowing easy customization when needed.
+
 ## Prompt Structure
 
 ### Basic YAML Format
@@ -229,6 +249,8 @@ Create a new file in `internal/llm/prompts/`:
 ```bash
 touch internal/llm/prompts/my_custom.prompt.yml
 ```
+
+**Note:** When developing from source, external files in `internal/llm/prompts/` automatically override embedded prompts. To use custom prompts in production, you need to rebuild the binary after adding the file (the new prompt will be embedded).
 
 ### Step 2: Define Prompt Structure
 
